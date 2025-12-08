@@ -1,0 +1,18 @@
+{
+  "name": "whistant_local",
+  "version": "1.0.0",
+  "description": "Link your Ollama server to iPhone with Whistant",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "dotenv": "^17.2.3",
+    "jsonwebtoken": "^9.0.0"
+  },
+  "devDependencies": {
+    "electron": "^39.2.5"
+  }
+}
