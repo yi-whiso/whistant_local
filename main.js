@@ -162,7 +162,7 @@ async function checkCloudflaredTunnel() {
 
 	console.warn('⚠️  No active cloudflared tunnel detected')
 	console.warn('📋 To create a tunnel, open a terminal and run:')
-	console.warn('   cloudflared tunnel --url http://localhost:11434')
+	console.warn(`   cloudflared tunnel --url ${OLLAMA_SERVER_URL}`)
 	return null
 }
 
@@ -179,7 +179,9 @@ async function startCloudflaredTunnel() {
 			})
 			console.log('✅ cloudflared is installed')
 		} catch (e) {
-			console.warn('⚠️  cloudflared not found. Install with: scoop install cloudflared')
+			const isWindows = os.platform() === 'win32'
+			const installCmd = isWindows ? 'scoop install cloudflared' : 'sudo apt install cloudflared'
+			console.warn(`⚠️  cloudflared not found. Install with: ${installCmd}`)
 			return null
 		}
 
@@ -376,17 +378,24 @@ async function monitorServices() {
  * Create the browser window
  */
 function createWindow() {
-	mainWindow = new BrowserWindow({
+	const iconPath = path.join(__dirname, 'ui', 'appicon.png')
+	const windowOptions = {
 		width: 600,
 		height: 800,
-		icon: path.join(__dirname, 'ui', 'appicon.png'),
 		webPreferences: {
 			preload: path.join(__dirname, 'preload.js'),
 			contextIsolation: true,
 			enableRemoteModule: false,
 			nodeIntegration: false,
 		},
-	})
+	}
+	
+	// Set icon if file exists (Linux requires icon to be set)
+	if (fs.existsSync(iconPath)) {
+		windowOptions.icon = iconPath
+	}
+	
+	mainWindow = new BrowserWindow(windowOptions)
 
 	mainWindow.loadFile('ui/index.html')
 	

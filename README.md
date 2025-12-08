@@ -1,16 +1,26 @@
-# Whistant - Windows Ollama Server Registration
+# Whistant - Ollama Server Registration
 
-Register your Windows Ollama server with the Whistant iPhone app using a link code.
+Register your Ollama server with the Whistant iPhone app using a link code.
 
 ## Quick Start
 
 ### Prerequisites
-- Windows 10+
-- Ollama running on localhost:11434
-- Ollama models pulled: for good performance, suggest agent model gpt-oss:20b, reasoning model deepseek-r1:14b
-- Cloudflared
-- Nvidia GPU with 24 GB or larger graphic memory; driver and cuda driver ready
-- Node.js with npm installed
+- **Operating System**: Windows 10+ or Ubuntu 20.04+
+- **Ollama**: Running on localhost:11434
+- **Models**: For good performance, suggest agent model gpt-oss:20b, reasoning model deepseek-r1:14b
+- **Cloudflared**: For remote access
+- **GPU**: Nvidia GPU with 24 GB or larger graphic memory; driver and CUDA ready
+- **Node.js**: v16+ with npm installed
+
+### Platform-Specific Requirements
+
+#### Windows
+- PowerShell
+- Install cloudflared: `scoop install cloudflared`
+
+#### Ubuntu/Linux
+- Bash terminal
+- Install cloudflared: `sudo apt install cloudflared` or download from [cloudflare releases](https://github.com/cloudflare/cloudflared/releases)
 
 ### Installation
 ```powershell
@@ -21,26 +31,39 @@ npm install
 ### Usage
 
 #### Step 1: Start the app
+**Windows:**
 ```powershell
+npm start
+```
+
+**Ubuntu/Linux:**
+```bash
 npm start
 ```
 
 #### Step 2: (Optional) Start a public tunnel in another terminal
 If you need access from outside your network:
+
+**Windows:**
 ```powershell
+cloudflared tunnel --url http://localhost:11434
+```
+
+**Ubuntu/Linux:**
+```bash
 cloudflared tunnel --url http://localhost:11434
 ```
 
 #### Step 3: Register in the app
 1. Get a 6-character link code from your iPhone's Whistant app
-2. Paste it in the Windows app
+2. Paste it in the desktop app
 3. Click "Register Server"
 4. Done!
 
 ## How It Works
 
 1. **iPhone app generates link code** - User taps "Link Ollama Server" on iPhone
-2. **Windows app receives link code** - User enters the code in the registration UI
+2. **Desktop app receives link code** - User enters the code in the registration UI
 3. **App sends registration** - Sends link code + server info to whistant server
 4. **Server validates & binds** - whistant server matches link code to user and stores server info
 5. **iPhone connects** - iPhone app connects to the server through the provided tunnel URL
