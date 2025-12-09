@@ -67,11 +67,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 		document.getElementById('success-server-id').textContent = registration.serverId || '-'
 		document.getElementById('success-os').textContent = registration.os || '-'
 		document.getElementById('success-device').textContent = registration.device || '-'
-		document.getElementById('success-model').textContent = registration.model || '-'
 		document.getElementById('success-url').textContent = registration.url || '-'
 		document.getElementById('success-nvidia-driver').textContent = registration.nvidiaDriver || '-'
 		document.getElementById('success-cuda-version').textContent = registration.cudaVersion || '-'
 		showScreen('screen-success')
+		// Load system info and display models list on success screen
+		await loadSuccessSystemInfo()
+		await displayModelsListOnSuccess()
 	} else {
 		// Show check ollama screen and wait for it
 		showScreen('screen-check-ollama')
@@ -145,13 +147,59 @@ async function displayModelsList(models) {
 		const modelName = model.name || model
 		const isLoaded = loadedModels.includes(modelName)
 		const icon = isLoaded ? '🟢' : '⚪'
-		const status = isLoaded ? '<span style="color: #4caf50; font-weight: 600;"> (Loaded in GPU)</span>' : ''
+		const status = isLoaded ? '<span style="color: #4caf50; font-weight: 600;"> (Loaded)</span>' : ''
 		html += `<div style="padding: 4px 0; font-size: 14px;">${icon} ${modelName}${status}</div>`
 	})
 	
 	modelsList.innerHTML = html
 	console.log('✅ Models list displayed with', models.length, 'models,', loadedModels.length, 'loaded')
-}/**
+}
+
+/**
+ * Display models list on success screen
+ */
+async function displayModelsListOnSuccess() {
+	const modelsList = document.getElementById('success-models-list')
+	if (!modelsList) return
+	
+	try {
+		// Get current models from Ollama
+		const result = await window.whistant.checkOllama()
+		if (!result.success || !result.models || result.models.length === 0) {
+			modelsList.innerHTML = '<div style="color: #666;">No models available</div>'
+			return
+		}
+		
+		// Get list of loaded models from Ollama
+		let loadedModels = []
+		try {
+			const psResult = await window.whistant.checkLoadedModels()
+			if (psResult.success) {
+				loadedModels = psResult.models || []
+			}
+		} catch (e) {
+			console.warn('Could not fetch loaded models')
+		}
+		
+		// Build the models list HTML
+		let html = ''
+		result.models.forEach(model => {
+			const modelName = model.name || model
+			const isLoaded = loadedModels.includes(modelName)
+			const icon = isLoaded ? '🟢' : '⚪'
+			const status = isLoaded ? '<span style="color: #4caf50; font-weight: 600;"> (Loaded)</span>' : ''
+			html += `<div style="padding: 4px 0; font-size: 14px;">${icon} ${modelName}${status}</div>`
+		})
+		
+		modelsList.innerHTML = html
+		console.log('✅ Models list displayed on success screen with', result.models.length, 'models,', loadedModels.length, 'loaded')
+	} catch (error) {
+		console.error('Failed to display models list on success screen:', error)
+		modelsList.innerHTML = '<div style="color: #666;">Error loading models</div>'
+	}
+}
+
+/**
  * Load and display system information
  */
 async function loadSystemInfo() {
@@ -164,20 +212,33 @@ async function loadSystemInfo() {
 			document.getElementById('code-memory').textContent = sysInfo.memory || '-'
 			
 			// Format graphics info
-			let graphicsText = sysInfo.graphics || '-'
-			if (sysInfo.graphicsMemory && sysInfo.graphicsMemory !== 'N/A') {
-				graphicsText += ` (${sysInfo.graphicsMemory})`
-			}
+			let graphicsText = sysInfo.gpu || '-'
 			document.getElementById('code-graphics').textContent = graphicsText
 			
 			document.getElementById('code-nvidia-driver').textContent = sysInfo.nvidiaDriver || '-'
 			document.getElementById('code-cuda').textContent = sysInfo.cuda || '-'
-			document.getElementById('code-models').textContent = sysInfo.models?.join(', ') || '-'
 			document.getElementById('code-url').textContent = sysInfo.url || '-'
 			console.log('✅ System info loaded')
 		}
 	} catch (error) {
 		console.error('Failed to load system info:', error)
+	}
+}
+
+/**
+ * Load and display system information on success screen
+ */
+async function loadSuccessSystemInfo() {
+	try {
+		const sysInfo = await window.whistant.getSystemInfo()
+		if (sysInfo.success) {
+			document.getElementById('success-cpu').textContent = sysInfo.cpu || '-'
+			document.getElementById('success-memory').textContent = sysInfo.memory || '-'
+			document.getElementById('success-graphics').textContent = sysInfo.gpu || '-'
+			console.log('✅ Success screen system info loaded')
+		}
+	} catch (error) {
+		console.error('Failed to load success screen system info:', error)
 	}
 }
 
@@ -231,11 +292,13 @@ async function submitLinkCode() {
 			document.getElementById('success-server-id').textContent = registerResult.data.serverId || '-'
 			document.getElementById('success-os').textContent = registerResult.data.os || '-'
 			document.getElementById('success-device').textContent = registerResult.data.device || '-'
-			document.getElementById('success-model').textContent = (registerResult.data.models || []).join(', ') || '-'
 			document.getElementById('success-url').textContent = registerResult.data.url || '-'
 			document.getElementById('success-nvidia-driver').textContent = registerResult.data.nvidiaDriver || '-'
 			document.getElementById('success-cuda-version').textContent = registerResult.data.cudaVersion || '-'
 			showScreen('screen-success')
+			// Load system info and display models list on success screen
+			await loadSuccessSystemInfo()
+			await displayModelsListOnSuccess()
 			console.log('✅ Server linked to Whistant!')
 		} else {
 			throw new Error(registerResult.error || 'Registration failed - server did not confirm')
@@ -274,6 +337,18 @@ async function checkServicesStatus() {
 		const ollamaCodeStatus = document.getElementById('code-screen-ollama')
 		if (ollamaCodeStatus) {
 			ollamaCodeStatus.textContent = ollamaResult.success ? '✅ Running' : '❌ Not running'
+		}
+		
+		// Update models list with loaded status on code entry screen
+		if (ollamaResult.success && ollamaResult.models) {
+			await displayModelsList(ollamaResult.models)
+		}
+	}
+	
+	// Update models list on success screen if that's the active screen
+	if (currentScreen === 'screen-success') {
+		if (ollamaResult.success && ollamaResult.models) {
+			await displayModelsListOnSuccess()
 		}
 	}
 
