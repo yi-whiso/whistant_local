@@ -3,7 +3,36 @@
  * Device linking via code (like YouTube TV)
  */
 
-require('dotenv').config()
+// Load environment variables with fallbacks for AppImage/runtime
+const dotenv = require('dotenv')
+function loadEnv() {
+	// 1) Try current working directory
+	const cwdEnv = path.join(process.cwd(), '.env')
+	if (fs.existsSync(cwdEnv)) {
+		dotenv.config({ path: cwdEnv })
+		return
+	}
+	// 2) Try user home config: ~/.whistant_local/.env
+	const homeEnvDir = path.join(os.homedir(), '.whistant_local')
+	const homeEnv = path.join(homeEnvDir, '.env')
+	if (fs.existsSync(homeEnv)) {
+		dotenv.config({ path: homeEnv })
+		return
+	}
+	// 3) Try Electron userData directory
+	try {
+		const userDataDir = app ? app.getPath('userData') : null
+		if (userDataDir) {
+			const userDataEnv = path.join(userDataDir, '.env')
+			if (fs.existsSync(userDataEnv)) {
+				dotenv.config({ path: userDataEnv })
+				return
+			}
+		}
+	} catch {}
+	// If none found, proceed with defaults below
+}
+loadEnv()
 
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron')
 const path = require('path')
@@ -13,9 +42,22 @@ const axios = require('axios')
 const { execSync, spawn } = require('child_process')
 const { log } = require('console')
 
-// Environment variables
-const WHISTANT_SERVER_URL = process.env.WHISTANT_SERVER_URL || 'https://whisolla.com:2087'
-const OLLAMA_SERVER_URL = process.env.OLLAMA_SERVER_URL || 'http://localhost:11434'
+// Load built-in defaults and then overlay environment variables
+let DEFAULTS = { WHISTANT_SERVER_URL: 'https://whisolla.com:2087', OLLAMA_SERVER_URL: 'http://localhost:11434' }
+try {
+	const defaultsPath = path.join(__dirname, 'config', 'defaults.json')
+	if (fs.existsSync(defaultsPath)) {
+		const raw = fs.readFileSync(defaultsPath, 'utf-8')
+		const parsed = JSON.parse(raw)
+		DEFAULTS = { ...DEFAULTS, ...parsed }
+	}
+} catch (e) {
+	console.warn('⚠️  Failed to load defaults.json, using hardcoded defaults')
+}
+
+// Environment variables (override defaults if provided)
+const WHISTANT_SERVER_URL = process.env.WHISTANT_SERVER_URL || DEFAULTS.WHISTANT_SERVER_URL
+const OLLAMA_SERVER_URL = process.env.OLLAMA_SERVER_URL || DEFAULTS.OLLAMA_SERVER_URL
 
 /**
  * Get NVIDIA driver and CUDA version

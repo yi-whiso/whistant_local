@@ -3,9 +3,15 @@
   "version": "1.0.0",
   "description": "Link your Ollama server to iPhone with Whistant",
   "main": "main.js",
+  "author": "Whistant",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev"
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:linux": "electron-builder --linux",
+    "build:appimage": "electron-builder --linux AppImage",
+    "build:deb": "electron-builder --linux deb",
+    "build:snap": "electron-builder --linux snap"
   },
   "dependencies": {
     "axios": "^1.4.0",
@@ -13,6 +19,38 @@
     "jsonwebtoken": "^9.0.0"
   },
   "devDependencies": {
-    "electron": "^39.2.5"
+    "electron": "^39.2.5",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.whistant.local",
+    "productName": "Whistant Local",
+    "asar": true,
+    "compression": "maximum",
+    "files": [
+      "main.js",
+      "preload.js",
+      "config/defaults.json",
+      "ui/**/*",
+      "package.json",
+      "!dist/**",
+      "!.git/**",
+      "!**/*.md",
+      "!**/test/**",
+      "!**/tests/**",
+      "!**/*.map"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network",
+      "icon": "ui/icon.png",
+      "maintainer": "Whistant <support@whistant.com>"
+    },
+    "directories": {
+      "output": "dist"
+    }
   }
 }
