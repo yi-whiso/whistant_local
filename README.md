@@ -101,6 +101,40 @@ ngrok http 11434
 ```
 
 ## Development
+## Windows Portable Build (from Linux)
+
+You can generate a standalone Windows portable `.exe` on Linux using `electron-builder` with Wine.
+
+Prerequisites:
+- Wine and Mono for cross-building Squirrel/NSIS-free portable targets
+- `electron-builder` already listed in `devDependencies`
+
+Install prerequisites on Debian/Ubuntu-based distros:
+
+```bash
+sudo apt update
+sudo apt install -y wine64 wine32
+```
+
+Optional: provide a Windows icon at `ui/icon.ico` for better branding. If absent, electron-builder will use a default icon.
+
+Build commands:
+
+```bash
+# Build Windows portable x64
+npm run build:win:x64
+
+# Or generic portable (defaults to x64)
+npm run build:win
+```
+
+Output:
+- Files are placed under `dist/`.
+- Look for `Whistant Local Portable.exe` (name may vary by version/productName).
+
+Notes:
+- The portable build produces a single `.exe` that runs without installation and without extra preparation on Windows.
+- Code signing is optional and not required for local/portable usage; unsigned binaries may trigger SmartScreen.
 
 ### Dev mode with DevTools
 ```powershell

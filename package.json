@@ -6,17 +6,22 @@
   "author": "Whistant",
   "scripts": {
     "start": "electron .",
+    "icon:build": "node scripts/convert-icon.js",
     "dev": "electron . --dev",
     "build": "electron-builder",
     "build:linux": "electron-builder --linux",
     "build:appimage": "electron-builder --linux AppImage",
     "build:deb": "electron-builder --linux deb",
-    "build:snap": "electron-builder --linux snap"
+    "build:snap": "electron-builder --linux snap",
+    "build:win": "electron-builder --win portable",
+    "build:win:x64": "electron-builder --win portable --x64",
+    "build:win:ia32": "electron-builder --win portable --ia32"
   },
   "dependencies": {
     "axios": "^1.4.0",
     "dotenv": "^17.2.3",
-    "jsonwebtoken": "^9.0.0"
+    "jsonwebtoken": "^9.0.0",
+    "png-to-ico": "^3.0.1"
   },
   "devDependencies": {
     "electron": "^39.2.5",
@@ -40,6 +45,18 @@
       "!**/tests/**",
       "!**/*.map"
     ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "ui/icon.ico",
+      "publisherName": "Whistant"
+    },
     "linux": {
       "target": [
         "AppImage",
