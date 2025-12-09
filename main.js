@@ -452,6 +452,19 @@ function createWindow() {
 		mainWindow.webContents.openDevTools()
 	}
 
+	// On Windows, ensure closing the window exits the app and cleans up
+	mainWindow.on('close', () => {
+		try {
+			if (cloudflaredProcess) {
+				cloudflaredProcess.kill()
+				cloudflaredProcess = null
+			}
+		} catch (e) {}
+		if (process.platform === 'win32') {
+			app.quit()
+		}
+	})
+
 	mainWindow.on('closed', () => {
 		mainWindow = null
 	})
@@ -490,6 +503,16 @@ app.on('window-all-closed', () => {
 	if (process.platform !== 'darwin') {
 		app.quit()
 	}
+})
+
+// Extra safety: ensure child processes are killed on quit
+app.on('will-quit', () => {
+	try {
+		if (cloudflaredProcess) {
+			cloudflaredProcess.kill()
+			cloudflaredProcess = null
+		}
+	} catch (e) {}
 })
 
 app.on('activate', () => {
