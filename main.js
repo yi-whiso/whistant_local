@@ -5,6 +5,14 @@
 
 // Load environment variables with fallbacks for AppImage/runtime
 const dotenv = require('dotenv')
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron')
+const path = require('path')
+const fs = require('fs')
+const os = require('os')
+const axios = require('axios')
+const { execSync, spawn } = require('child_process')
+const { log } = require('console')
+
 function loadEnv() {
 	// 1) Try current working directory
 	const cwdEnv = path.join(process.cwd(), '.env')
@@ -33,14 +41,6 @@ function loadEnv() {
 	// If none found, proceed with defaults below
 }
 loadEnv()
-
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron')
-const path = require('path')
-const fs = require('fs')
-const os = require('os')
-const axios = require('axios')
-const { execSync, spawn } = require('child_process')
-const { log } = require('console')
 
 // Load built-in defaults and then overlay environment variables
 let DEFAULTS = { WHISTANT_SERVER_URL: 'https://whisolla.com:2087', OLLAMA_SERVER_URL: 'http://localhost:11434' }
