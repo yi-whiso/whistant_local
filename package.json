@@ -29,7 +29,7 @@
   },
   "build": {
     "appId": "com.whistant.local",
-    "productName": "Whistant Local",
+    "productName": "Whistant_Local",
     "asar": true,
     "compression": "maximum",
     "files": [
@@ -55,7 +55,7 @@
         }
       ],
       "icon": "ui/icon.ico",
-      "publisherName": "Whistant"
+      "publisherName": "Whisolla <contact@whisolla.com>"
     },
     "linux": {
       "target": [
@@ -64,7 +64,7 @@
       ],
       "category": "Network",
       "icon": "ui/icon.png",
-      "maintainer": "Whistant <support@whistant.com>"
+      "maintainer": "Whisolla <contact@whisolla.com>"
     },
     "directories": {
       "output": "dist"
