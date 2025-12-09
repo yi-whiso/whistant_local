@@ -10,8 +10,8 @@ const path = require('path')
 const fs = require('fs')
 const os = require('os')
 const axios = require('axios')
-const crypto = require('crypto')
 const { execSync, spawn } = require('child_process')
+const { log } = require('console')
 
 // Environment variables
 const WHISTANT_SERVER_URL = process.env.WHISTANT_SERVER_URL || 'https://whisolla.com:2087'
@@ -43,7 +43,7 @@ function getNvidiaInfo() {
 				cudaVersion = cudaMatch[1]
 			}
 		} catch (e) {
-			// Fall back to driver version if CUDA version not found
+			console.warn('⚠️  Could not determine CUDA version from nvidia-smi')
 		}
 		
 		return {
@@ -86,6 +86,7 @@ function collectSystemInfo() {
 
 	const hardware = {
 		cpu: `${cpuInfo.length}x ${cpuInfo[0].model}`,
+		gpu: `${nvidiaInfo.name} (${nvidiaInfo.memory})`,
 		memory: `${(totalMemory / (1024 ** 3)).toFixed(2)} GB`,
 		nvidiaDriver: nvidiaInfo.driver,
 		cudaVersion: nvidiaInfo.cuda,
@@ -140,7 +141,7 @@ async function getCloudflaredUrl() {
 			}
 		}
 	} catch (e) {
-		// Metrics endpoint not available - tunnel not running
+		console.warn('⚠️  Could not connect to cloudflared local API to get tunnel URL')
 	}
 
 	return null
@@ -157,7 +158,7 @@ async function checkCloudflaredTunnel() {
 			return url
 		}
 	} catch (e) {
-		// Tunnel not available
+		console.warn('⚠️  Error checking cloudflared tunnel:', e.message)
 	}
 
 	console.warn('⚠️  No active cloudflared tunnel detected')
@@ -180,7 +181,7 @@ async function startCloudflaredTunnel() {
 			console.log('✅ cloudflared is installed')
 		} catch (e) {
 			const isWindows = os.platform() === 'win32'
-			const installCmd = isWindows ? 'scoop install cloudflared' : 'sudo apt install cloudflared'
+			const installCmd = isWindows ? 'winget install --id Cloudflare.cloudflared' : 'sudo apt install cloudflared'
 			console.warn(`⚠️  cloudflared not found. Install with: ${installCmd}`)
 			return null
 		}
@@ -309,7 +310,7 @@ async function updateServerUrlIfRegistered(newUrl) {
 		}
 
 		const response = await axios.post(
-			'https://whisolla.com:2087/server/register',
+			WHISTANT_SERVER_URL + '/server/register',
 			payload,
 			{ headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
 		)
@@ -353,6 +354,8 @@ async function monitorServices() {
 		if (tunnelUrl) {
 			detectedTunnelUrl = tunnelUrl
 			console.log('✅ Tunnel is active:', tunnelUrl)
+			// Check if URL changed and update if needed
+			await updateServerUrlIfRegistered(tunnelUrl)
 		} else {
 			console.warn('⚠️  Tunnel is down, restarting cloudflared...')
 			// Kill old process if still running
@@ -457,35 +460,6 @@ app.on('activate', () => {
  * IPC Handlers - Renderer to Main communication
  */
 
-// Generate device code
-ipcMain.handle('generate-device-code', async (event) => {
-	try {
-		// Generate a random 6-character code
-		const code = Math.random().toString(36).substr(2, 6).toUpperCase()
-		const deviceId = os.hostname()
-		const timestamp = Date.now()
-
-		const deviceCode = {
-			code,
-			deviceId,
-			timestamp,
-		}
-
-		// Save to file for polling
-		const codePath = path.join(app.getPath('userData'), 'device-code.json')
-		fs.writeFileSync(codePath, JSON.stringify(deviceCode, null, 2))
-
-		console.log(`Generated device code: ${code}`)
-
-		return {
-			success: true,
-			code,
-		}
-	} catch (error) {
-		return { success: false, error: error.message }
-	}
-})
-
 // Poll for linking completion
 ipcMain.handle('poll-linking-status', async (event, code) => {
 	try {
@@ -505,47 +479,6 @@ ipcMain.handle('poll-linking-status', async (event, code) => {
 		return { success: true, linked: false }
 	} catch (error) {
 		return { success: false, error: error.message }
-	}
-})
-
-// Submit device code to Whisolla server
-ipcMain.handle('submit-device-code', async (event, code) => {
-	try {
-		const hostname = os.hostname()
-		const cpuInfo = os.cpus()
-		const totalMemory = os.totalmem()
-
-		const payload = {
-			code,
-			deviceId: hostname,
-			platform: os.platform(),
-			hardware: {
-				cpu: `${cpuInfo.length}x ${cpuInfo[0].model}`,
-				memory: `${(totalMemory / (1024 ** 3)).toFixed(2)} GB`,
-			},
-			ollamaUrl: OLLAMA_SERVER_URL,
-		}
-
-		console.log(`📝 Submitting device code to Whisolla: ${code}`)
-
-		const response = await axios.post(
-			`${WHISTANT_SERVER_URL}/device/link`,
-			payload,
-			{ headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
-		)
-
-		console.log('✅ Code submitted to server!')
-
-		return {
-			success: true,
-			data: response.data,
-		}
-	} catch (error) {
-		console.error('Code submission error:', error.message)
-		return {
-			success: false,
-			error: error.response?.data?.error || error.message,
-		}
 	}
 })
 
@@ -671,33 +604,6 @@ ipcMain.handle('register-server', async (event, { linkCode }) => {
 			success: false,
 			error: error.message || 'Failed to collect system information',
 		}
-	}
-})
-
-// Update server URL on Whistant backend
-ipcMain.handle('update-server-url', async (event, { serverId, url }) => {
-	try {
-		console.log(`📡 Updating server URL on Whistant: ${serverId} -> ${url}`)
-		
-		const payload = {
-			link_code: serverId.toLowerCase(),
-			url: url,
-		}
-
-		const response = await axios.post(
-			`${WHISTANT_SERVER_URL}/server/register`,
-			payload,
-			{ headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
-		)
-
-		console.log('✅ Server URL updated on Whistant backend')
-		return { success: true, data: response.data }
-	} catch (error) {
-		console.error('❌ Failed to update server URL:', error.message)
-		if (error.response?.data) {
-			console.error('Server response:', JSON.stringify(error.response.data, null, 2))
-		}
-		return { success: false, error: error.message }
 	}
 })
 
@@ -842,9 +748,8 @@ ipcMain.handle('get-system-info', async (event) => {
 			os: `${platform} ${release} (${arch})`,
 			device: hostname,
 			cpu: `${cpuInfo.length}x ${cpuInfo[0].model}`,
+			gpu: `${nvidiaInfo.name} (${nvidiaInfo.memory})`,
 			memory: `${(totalMemory / (1024 ** 3)).toFixed(2)} GB`,
-			graphics: nvidiaInfo.name,
-			graphicsMemory: nvidiaInfo.memory,
 			nvidiaDriver: nvidiaInfo.driver,
 			cuda: nvidiaInfo.cuda,
 			models: models,

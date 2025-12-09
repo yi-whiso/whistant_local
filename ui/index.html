@@ -58,12 +58,6 @@
 			<p>Open Whistant on your iPhone and get your link code</p>
 
 			<div class="form">
-				<div style="margin-bottom: 16px;">
-					<label style="display: block; margin-bottom: 8px; font-weight: 600; text-align: left;">Available Models:</label>
-					<div id="models-list" style="background: #f5f5f5; border: 2px solid #ddd; border-radius: 8px; padding: 12px; text-align: left; max-height: 200px; overflow-y: auto;">
-						<div style="color: #666;">Loading models...</div>
-					</div>
-				</div>
 				<input 
 					type="text" 
 					id="link-code-input" 
@@ -74,6 +68,12 @@
 				<button class="btn btn-primary" onclick="submitLinkCode()" id="submit-code-btn">
 					Link Server
 				</button>
+				<div style="margin-top: 16px;">
+					<label style="display: block; margin-bottom: 8px; font-weight: 600; text-align: left;">Available Models:</label>
+					<div id="models-list" style="background: #f5f5f5; border: 2px solid #ddd; border-radius: 8px; padding: 12px; text-align: left; max-height: 200px; overflow-y: auto;">
+						<div style="color: #666;">Loading models...</div>
+					</div>
+				</div>
 			</div>
 
 			<div class="success-info" style="margin-top: 20px;">
@@ -106,10 +106,6 @@
 					<span class="value" id="code-cuda">-</span>
 				</div>
 				<div class="info-item">
-					<span class="label">Models:</span>
-					<span class="value" id="code-models">-</span>
-				</div>
-				<div class="info-item">
 					<span class="label">Tunnel URL:</span>
 					<span class="value" id="code-url">-</span>
 				</div>
@@ -131,6 +127,13 @@
 
 			<button class="btn btn-secondary" onclick="unlinkServer()" style="margin-top: 10px; margin-bottom: 16px;">Unlink Server</button>
 
+			<div style="margin-bottom: 16px;">
+				<label style="display: block; margin-bottom: 8px; font-weight: 600; text-align: left;">Available Models:</label>
+				<div id="success-models-list" style="background: #f5f5f5; border: 2px solid #ddd; border-radius: 8px; padding: 12px; text-align: left; max-height: 200px; overflow-y: auto;">
+					<div style="color: #666;">Loading models...</div>
+				</div>
+			</div>
+
 			<div class="success-info">
 					<div class="info-item">
 						<span class="label">Username:</span>
@@ -149,12 +152,16 @@
 						<span class="value" id="success-device">-</span>
 					</div>
 					<div class="info-item">
-						<span class="label">Model:</span>
-						<span class="value" id="success-model">-</span>
+						<span class="label">CPU:</span>
+						<span class="value" id="success-cpu">-</span>
 					</div>
 					<div class="info-item">
-						<span class="label">URL:</span>
-						<span class="value" id="success-url">-</span>
+						<span class="label">Memory:</span>
+						<span class="value" id="success-memory">-</span>
+					</div>
+					<div class="info-item">
+						<span class="label">Graphics:</span>
+						<span class="value" id="success-graphics">-</span>
 					</div>
 					<div class="info-item">
 						<span class="label">NVIDIA Driver:</span>
@@ -163,6 +170,10 @@
 					<div class="info-item">
 						<span class="label">CUDA Version:</span>
 						<span class="value" id="success-cuda-version">-</span>
+					</div>
+					<div class="info-item">
+						<span class="label">URL:</span>
+						<span class="value" id="success-url">-</span>
 					</div>
 				</div>
 			</div>
