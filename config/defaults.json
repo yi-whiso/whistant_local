@@ -1,0 +1,4 @@
+{
+  "WHISTANT_SERVER_URL": "https://whisolla.com:2087",
+  "OLLAMA_SERVER_URL": "http://localhost:11434"
+}
