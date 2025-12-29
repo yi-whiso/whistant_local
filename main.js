@@ -939,9 +939,23 @@ ipcMain.handle('get-system-info', async (event) => {
 		const cpuInfo = os.cpus()
 		const totalMemory = os.totalmem()
 		const nvidiaInfo = getNvidiaInfo()
+		const amdInfo = getAmdInfo()
+		const macInfo = getMacInfo()
 		const platform = os.platform()
 		const release = os.release()
 		const arch = os.arch()
+		
+		// Determine which GPU to display
+		let gpuInfo = nvidiaInfo
+		let gpuType = 'nvidia'
+		
+		if (!nvidiaInfo.available && amdInfo.available) {
+			gpuInfo = amdInfo
+			gpuType = 'amd'
+		} else if (!nvidiaInfo.available && !amdInfo.available && macInfo.available) {
+			gpuInfo = macInfo
+			gpuType = 'mac'
+		}
 		
 		// Get Ollama models
 		let models = []
@@ -967,12 +981,16 @@ ipcMain.handle('get-system-info', async (event) => {
 			os: `${platform} ${release} (${arch})`,
 			device: hostname,
 			cpu: `${cpuInfo.length}x ${cpuInfo[0].model}`,
-			gpu: `${nvidiaInfo.name} (${nvidiaInfo.memory})`,
+			gpu: `${gpuInfo.name} (${gpuInfo.memory})`,
 			memory: `${(totalMemory / (1024 ** 3)).toFixed(2)} GB`,
 			nvidiaDriver: nvidiaInfo.driver,
 			cuda: nvidiaInfo.cuda,
 			models: models,
 			url: tunnelUrl,
+			gpuType: gpuType,
+			nvidiaInfo: nvidiaInfo,
+			amdInfo: amdInfo,
+			macInfo: macInfo,
 		}
 	} catch (error) {
 		return { success: false, error: error.message }

@@ -65,11 +65,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 		// Successfully registered with Whistant server - show success screen
 		document.getElementById('success-username').textContent = registration.username || '-'
 		document.getElementById('success-server-id').textContent = registration.serverId || '-'
+		document.getElementById('success-url').textContent = registration.url || '-'
 		document.getElementById('success-os').textContent = registration.os || '-'
 		document.getElementById('success-device').textContent = registration.device || '-'
-		document.getElementById('success-url').textContent = registration.url || '-'
-		document.getElementById('success-nvidia-driver').textContent = registration.nvidiaDriver || '-'
-		document.getElementById('success-cuda-version').textContent = registration.cudaVersion || '-'
 		showScreen('screen-success')
 		// Load system info and display models list on success screen
 		await loadSuccessSystemInfo()
@@ -211,14 +209,28 @@ async function loadSystemInfo() {
 			document.getElementById('code-cpu').textContent = sysInfo.cpu || '-'
 			document.getElementById('code-memory').textContent = sysInfo.memory || '-'
 			
-			// Format graphics info
+			// Format graphics info based on GPU type
 			let graphicsText = sysInfo.gpu || '-'
+			if (sysInfo.gpuType === 'nvidia') {
+				graphicsText += ' | NVIDIA'
+			} else if (sysInfo.gpuType === 'amd') {
+				graphicsText += ' | AMD'
+			} else if (sysInfo.gpuType === 'mac') {
+				graphicsText += ' | Apple'
+			}
 			document.getElementById('code-graphics').textContent = graphicsText
 			
-			document.getElementById('code-nvidia-driver').textContent = sysInfo.nvidiaDriver || '-'
-			document.getElementById('code-cuda').textContent = sysInfo.cuda || '-'
+			// Show driver/CUDA info only for NVIDIA
+			if (sysInfo.gpuType === 'nvidia') {
+				document.getElementById('code-nvidia-driver').textContent = sysInfo.nvidiaDriver || '-'
+				document.getElementById('code-cuda').textContent = sysInfo.cuda || '-'
+			} else {
+				document.getElementById('code-nvidia-driver').textContent = 'N/A'
+				document.getElementById('code-cuda').textContent = 'N/A'
+			}
+			
 			document.getElementById('code-url').textContent = sysInfo.url || '-'
-			console.log('✅ System info loaded')
+			console.log(`✅ System info loaded (GPU Type: ${sysInfo.gpuType})`)
 		}
 	} catch (error) {
 		console.error('Failed to load system info:', error)
@@ -234,8 +246,53 @@ async function loadSuccessSystemInfo() {
 		if (sysInfo.success) {
 			document.getElementById('success-cpu').textContent = sysInfo.cpu || '-'
 			document.getElementById('success-memory').textContent = sysInfo.memory || '-'
-			document.getElementById('success-graphics').textContent = sysInfo.gpu || '-'
-			console.log('✅ Success screen system info loaded')
+			
+			// Format graphics info based on GPU type
+			let graphicsText = sysInfo.gpu || '-'
+			if (sysInfo.gpuType === 'nvidia') {
+				graphicsText += ' | NVIDIA'
+			} else if (sysInfo.gpuType === 'amd') {
+				graphicsText += ' | AMD'
+			} else if (sysInfo.gpuType === 'mac') {
+				graphicsText += ' | Apple'
+			}
+			document.getElementById('success-graphics').textContent = graphicsText
+			
+			// Show GPU-specific details
+			const detail1 = document.getElementById('success-gpu-detail-1')
+			const detail2 = document.getElementById('success-gpu-detail-2')
+			const detail1Label = document.getElementById('success-gpu-detail-1-label')
+			const detail1Value = document.getElementById('success-gpu-detail-1-value')
+			const detail2Label = document.getElementById('success-gpu-detail-2-label')
+			const detail2Value = document.getElementById('success-gpu-detail-2-value')
+			
+			if (sysInfo.gpuType === 'nvidia') {
+				// Show NVIDIA driver and CUDA
+				detail1.style.display = ''
+				detail2.style.display = ''
+				detail1Label.textContent = 'NVIDIA Driver:'
+				detail1Value.textContent = sysInfo.nvidiaDriver || 'Not available'
+				detail2Label.textContent = 'CUDA Version:'
+				detail2Value.textContent = sysInfo.cuda || 'Not available'
+			} else if (sysInfo.gpuType === 'amd' && sysInfo.amdInfo) {
+				// Show AMD info
+				detail1.style.display = ''
+				detail2.style.display = 'none'
+				detail1Label.textContent = 'AMD GPU:'
+				detail1Value.textContent = sysInfo.amdInfo.name || 'AMD GPU detected'
+			} else if (sysInfo.gpuType === 'mac' && sysInfo.macInfo) {
+				// Show Mac Metal info
+				detail1.style.display = ''
+				detail2.style.display = 'none'
+				detail1Label.textContent = 'Metal Support:'
+				detail1Value.textContent = sysInfo.macInfo.metal ? 'Supported' : 'Not supported'
+			} else {
+				// Hide GPU details if no specific info
+				detail1.style.display = 'none'
+				detail2.style.display = 'none'
+			}
+			
+			console.log(`✅ Success screen system info loaded (GPU Type: ${sysInfo.gpuType})`)
 		}
 	} catch (error) {
 		console.error('Failed to load success screen system info:', error)
@@ -290,11 +347,9 @@ async function submitLinkCode() {
 			// Show success screen
 			document.getElementById('success-username').textContent = registerResult.data.username || '-'
 			document.getElementById('success-server-id').textContent = registerResult.data.serverId || '-'
+			document.getElementById('success-url').textContent = registerResult.data.url || '-'
 			document.getElementById('success-os').textContent = registerResult.data.os || '-'
 			document.getElementById('success-device').textContent = registerResult.data.device || '-'
-			document.getElementById('success-url').textContent = registerResult.data.url || '-'
-			document.getElementById('success-nvidia-driver').textContent = registerResult.data.nvidiaDriver || '-'
-			document.getElementById('success-cuda-version').textContent = registerResult.data.cudaVersion || '-'
 			showScreen('screen-success')
 			// Load system info and display models list on success screen
 			await loadSuccessSystemInfo()
@@ -320,6 +375,9 @@ async function submitLinkCode() {
 let statusCheckInterval = null
 
 async function checkServicesStatus() {
+	// Get current screen once at the start
+	const currentScreen = document.querySelector('.screen.active')?.id
+	
 	// Check Ollama
 	const ollamaResult = await window.whistant.checkOllama()
 	const ollamaStatus = document.getElementById('ollama-status')
@@ -332,7 +390,6 @@ async function checkServicesStatus() {
 	}
 	
 	// Update code entry screen status
-	const currentScreen = document.querySelector('.screen.active')?.id
 	if (currentScreen === 'screen-enter-code') {
 		const ollamaCodeStatus = document.getElementById('code-screen-ollama')
 		if (ollamaCodeStatus) {
@@ -355,12 +412,12 @@ async function checkServicesStatus() {
 	// Check Cloudflared
 	const cloudflaredResult = await window.whistant.checkCloudflared()
 	const cloudflaredStatus = document.getElementById('cloudflared-status')
+	
 	if (cloudflaredResult.success) {
 		cloudflaredStatus.textContent = '✅'
 		cloudflaredStatus.title = `Tunnel: ${cloudflaredResult.url}`
 		
 		// Update the URL in success screen if displayed (UI only - server update happens in main process)
-		const currentScreen = document.querySelector('.screen.active')?.id
 		if (currentScreen === 'screen-success') {
 			const urlElement = document.getElementById('success-url')
 			const currentUrl = urlElement.textContent
@@ -371,16 +428,33 @@ async function checkServicesStatus() {
 			}
 		}
 		
-		// Update code entry screen URL
+		// Update code entry screen URL (before registration)
 		if (currentScreen === 'screen-enter-code') {
 			const urlElement = document.getElementById('code-url')
 			if (urlElement) {
 				urlElement.textContent = cloudflaredResult.url
+				console.log(`✅ Updated code entry URL to: ${cloudflaredResult.url}`)
 			}
 		}
 	} else {
 		cloudflaredStatus.textContent = '⚠️'
 		cloudflaredStatus.title = cloudflaredResult.error || 'Tunnel not available'
+		
+		// Show localhost or error message on code entry screen
+		if (currentScreen === 'screen-enter-code') {
+			const urlElement = document.getElementById('code-url')
+			if (urlElement) {
+				// Check if we have system info URL
+				try {
+					const sysInfo = await window.whistant.getSystemInfo()
+					if (sysInfo.success && sysInfo.url) {
+						urlElement.textContent = sysInfo.url
+					}
+				} catch (e) {
+					// Ignore error
+				}
+			}
+		}
 	}
 }
 
