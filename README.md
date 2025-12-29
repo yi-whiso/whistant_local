@@ -5,11 +5,11 @@ Register your Ollama server with the Whistant iPhone app using a link code.
 ## Quick Start
 
 ### Prerequisites
-- **Operating System**: Windows 10+ or Ubuntu 20.04+
+- **Operating System**: Windows 10+, Ubuntu 20.04+, or macOS 10.15+
 - **Ollama**: Running on localhost:11434
 - **Models**: For good performance, suggest agent model gpt-oss:20b, reasoning model deepseek-r1:14b
 - **Cloudflared**: For remote access
-- **GPU**: Nvidia GPU with 24 GB or larger graphic memory; driver and CUDA ready
+- **GPU**: Nvidia GPU with 24 GB or larger graphic memory (recommended); driver and CUDA ready. For Mac, Apple Silicon with 24 GB+ unified memory recommended
 - **Node.js**: v16+ with npm installed
 
 ### Platform-Specific Requirements
@@ -22,9 +22,26 @@ Register your Ollama server with the Whistant iPhone app using a link code.
 - Bash terminal
 - Install cloudflared: `sudo apt install cloudflared` or download from [cloudflare releases](https://github.com/cloudflare/cloudflared/releases)
 
+#### macOS
+- Terminal (zsh or bash)
+- Install cloudflared: `brew install cloudflared`
+
 ### Installation
+**Windows:**
 ```powershell
 cd c:\Users\xxx\whistant_local
+npm install
+```
+
+**Ubuntu/Linux:**
+```bash
+cd ~/whistant_local
+npm install
+```
+
+**macOS:**
+```bash
+cd ~/whistant_local
 npm install
 ```
 
@@ -41,6 +58,11 @@ npm start
 npm start
 ```
 
+**macOS:**
+```bash
+npm start
+```
+
 #### Step 2: (Optional) Start a public tunnel in another terminal
 If you need access from outside your network:
 
@@ -50,6 +72,11 @@ cloudflared tunnel --url http://localhost:11434
 ```
 
 **Ubuntu/Linux:**
+```bash
+cloudflared tunnel --url http://localhost:11434
+```
+
+**macOS:**
 ```bash
 cloudflared tunnel --url http://localhost:11434
 ```
@@ -79,28 +106,47 @@ The app header shows:
 For public access from anywhere (recommended):
 
 ### Cloudflared (Recommended)
+**Windows:**
 ```powershell
 scoop install cloudflared
 ```
 
+**Ubuntu/Linux:**
+```bash
+sudo apt install cloudflared
+```
+
+**macOS:**
+```bash
+brew install cloudflared
+```
+
 Then in a separate terminal:
+**Windows:**
 ```powershell
+cloudflared tunnel --url http://localhost:11434
+```
+
+**Ubuntu/Linux/macOS:**
+```bash
 cloudflared tunnel --url http://localhost:11434
 ```
 
 Keep this running. The app will automatically detect the tunnel URL.
 
-### ngrok (Alternative)
-```powershell
-scoop install ngrok
-```
-
-Then:
-```powershell
-ngrok http 11434
-```
-
 ## Development
+
+### Dev mode with DevTools
+**Windows:**
+```powershell
+npm run dev
+```
+
+**Ubuntu/Linux/macOS:**
+```bash
+npm run dev
+```
+
 ## Windows Portable Build (from Linux)
 
 You can generate a standalone Windows portable `.exe` on Linux using `electron-builder` with Wine.
@@ -136,10 +182,35 @@ Notes:
 - The portable build produces a single `.exe` that runs without installation and without extra preparation on Windows.
 - Code signing is optional and not required for local/portable usage; unsigned binaries may trigger SmartScreen.
 
-### Dev mode with DevTools
-```powershell
-npm run dev
+## macOS Build
+
+You can generate a macOS `.dmg` and `.app` bundle.
+
+Prerequisites:
+- macOS development machine or Linux with proper tooling
+- `electron-builder` already listed in `devDependencies`
+
+Build commands:
+
+**On macOS:**
+```bash
+# Build macOS DMG for Apple Silicon (arm64)
+npm run build:mac:arm64
+
+# Build macOS DMG for Intel (x64)
+npm run build:mac:x64
+
+# Build universal binary (both architectures)
+npm run build:mac
 ```
+
+Output:
+- Files are placed under `dist/`.
+- Look for `Whistant_Local-1.0.0-arm64.dmg` or similar.
+
+Notes:
+- Code signing requires an Apple Developer account and certificate.
+- Unsigned apps may require users to allow the app in System Preferences > Security & Privacy.
 
 ## File Structure
 
@@ -180,7 +251,7 @@ iPhone (Whistant App)
         ↓ (link code)
 Whistant Server (whistant.com:2087)
         ↓ (validates & stores)
-Windows Whistant App
+Desktop Whistant App (Windows/Linux/macOS)
         ↓ (registers with link code + hardware info)
 Whistant Server
         ↓ (server info stored in DB)

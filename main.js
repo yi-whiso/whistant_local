@@ -107,6 +107,140 @@ function getNvidiaInfo() {
 }
 
 /**
+ * Get AMD GPU information
+ */
+function getAmdInfo() {
+	try {
+		const platform = os.platform()
+		
+		if (platform === 'win32') {
+			// Windows: Use wmic to query AMD GPU
+			const output = execSync('wmic path win32_VideoController get name,AdapterRAM /format:csv', {
+				encoding: 'utf-8',
+				timeout: 5000,
+			}).trim()
+			
+			const lines = output.split('\n').filter(line => line.trim())
+			for (const line of lines) {
+				const parts = line.split(',')
+				if (parts.length >= 3 && parts[2] && (parts[2].includes('AMD') || parts[2].includes('Radeon'))) {
+					const name = parts[2].trim()
+					const memoryBytes = parseInt(parts[1]) || 0
+					const memory = memoryBytes > 0 ? `${(memoryBytes / (1024 ** 3)).toFixed(2)} GB` : 'Not available'
+					
+					return {
+						name: name,
+						memory: memory,
+						available: true,
+					}
+				}
+			}
+		} else if (platform === 'linux') {
+			// Linux: Use lspci to find AMD GPU
+			try {
+				const output = execSync('lspci | grep -i vga', {
+					encoding: 'utf-8',
+					timeout: 5000,
+				}).trim()
+				
+				if (output.includes('AMD') || output.includes('Radeon')) {
+					const match = output.match(/: (.+)/)
+					const name = match ? match[1].trim() : 'AMD GPU detected'
+					
+					// Try to get memory info from rocm-smi if available
+					let memory = 'Not available'
+					try {
+						const rocmOutput = execSync('rocm-smi --showmeminfo vram --csv', {
+							encoding: 'utf-8',
+							timeout: 5000,
+						})
+						const memMatch = rocmOutput.match(/(\d+)\s*MB/)
+						if (memMatch) {
+							memory = `${(parseInt(memMatch[1]) / 1024).toFixed(2)} GB`
+						}
+					} catch {}
+					
+					return {
+						name: name,
+						memory: memory,
+						available: true,
+					}
+				}
+			} catch {}
+		}
+		
+		return {
+			name: 'No AMD GPU detected',
+			memory: 'N/A',
+			available: false,
+		}
+	} catch (error) {
+		return {
+			name: 'No AMD GPU detected',
+			memory: 'N/A',
+			available: false,
+		}
+	}
+}
+
+/**
+ * Get Mac GPU information (Metal)
+ */
+function getMacInfo() {
+	try {
+		const platform = os.platform()
+		
+		if (platform === 'darwin') {
+			// macOS: Use system_profiler to query GPU
+			const output = execSync('system_profiler SPDisplaysDataType', {
+				encoding: 'utf-8',
+				timeout: 5000,
+			}).trim()
+			
+			// Parse for GPU name
+			const nameMatch = output.match(/Chipset Model:\s*(.+)/)
+			const name = nameMatch ? nameMatch[1].trim() : 'Mac GPU detected'
+			
+			// Parse for VRAM
+			let memory = 'Shared'
+			const vramMatch = output.match(/VRAM \(Total\):\s*(.+)/)
+			if (vramMatch) {
+				memory = vramMatch[1].trim()
+			} else {
+				// Check for unified memory on Apple Silicon
+				const memMatch = output.match(/Metal:\s*Supported/)
+				if (memMatch) {
+					memory = 'Unified Memory (Metal supported)'
+				}
+			}
+			
+			return {
+				name: name,
+				memory: memory,
+				available: true,
+				metal: true,
+			}
+		}
+		
+		return {
+			name: 'Not a Mac',
+			memory: 'N/A',
+			available: false,
+			metal: false,
+		}
+	} catch (error) {
+		return {
+			name: 'No Mac GPU detected',
+			memory: 'N/A',
+			available: false,
+			metal: false,
+		}
+	}
+}
+
+
+
+/**
  * Collect all system information
  */
 function collectSystemInfo() {
@@ -114,6 +248,8 @@ function collectSystemInfo() {
 	const cpuInfo = os.cpus()
 	const totalMemory = os.totalmem()
 	const nvidiaInfo = getNvidiaInfo()
+	const amdInfo = getAmdInfo()
+	const macInfo = getMacInfo()
 	const platform = os.platform()
 	const release = os.release()
 	const arch = os.arch()
@@ -126,9 +262,21 @@ function collectSystemInfo() {
 		uptime: os.uptime(),
 	}
 
+	// Determine which GPU to use for hardware info
+	let gpuInfo = nvidiaInfo
+	let gpuType = 'nvidia'
+	
+	if (!nvidiaInfo.available && amdInfo.available) {
+		gpuInfo = amdInfo
+		gpuType = 'amd'
+	} else if (!nvidiaInfo.available && !amdInfo.available && macInfo.available) {
+		gpuInfo = macInfo
+		gpuType = 'mac'
+	}
+
 	const hardware = {
 		cpu: `${cpuInfo.length}x ${cpuInfo[0].model}`,
-		gpu: `${nvidiaInfo.name} (${nvidiaInfo.memory})`,
+		gpu: `${gpuInfo.name} (${gpuInfo.memory})`,
 		memory: `${(totalMemory / (1024 ** 3)).toFixed(2)} GB`,
 		nvidiaDriver: nvidiaInfo.driver,
 		cudaVersion: nvidiaInfo.cuda,
@@ -139,6 +287,9 @@ function collectSystemInfo() {
 		osInfo,
 		hardware,
 		nvidiaInfo,
+		amdInfo,
+		macInfo,
+		gpuType,
 	}
 }
 
@@ -552,7 +703,7 @@ ipcMain.handle('register-server', async (event, { linkCode }) => {
 	try {
 		// Collect all system information
 		const systemInfo = collectSystemInfo()
-		const { deviceId, osInfo, hardware, nvidiaInfo } = systemInfo
+		const { deviceId, osInfo, hardware, nvidiaInfo, amdInfo, macInfo, gpuType } = systemInfo
 
 		// Get tunnel URL - wait for cloudflared if not available yet
 		let publicUrl = detectedTunnelUrl
@@ -645,6 +796,9 @@ ipcMain.handle('register-server', async (event, { linkCode }) => {
 					models: availableModels,
 					nvidiaDriver: nvidiaInfo.driver,
 					cudaVersion: nvidiaInfo.cuda,
+					gpuType: gpuType,
+					amdInfo: amdInfo,
+					macInfo: macInfo,
 				},
 			}
 		} catch (remoteError) {
