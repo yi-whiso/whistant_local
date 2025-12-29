@@ -27,38 +27,15 @@ Register your Ollama server with the Whistant iPhone app using a link code.
 - Install cloudflared: `brew install cloudflared`
 
 ### Installation
-**Windows:**
-```powershell
-cd c:\Users\xxx\whistant_local
-npm install
-```
-
-**Ubuntu/Linux:**
 ```bash
-cd ~/whistant_local
+cd /path/to/whistant_local
 npm install
 ```
-
-**macOS:**
-```bash
-cd ~/whistant_local
-npm install
-```
+Note: Use `c:\Users\xxx\whistant_local` on Windows, `~/whistant_local` on Linux/macOS.
 
 ### Usage
 
 #### Step 1: Start the app
-**Windows:**
-```powershell
-npm start
-```
-
-**Ubuntu/Linux:**
-```bash
-npm start
-```
-
-**macOS:**
 ```bash
 npm start
 ```
@@ -66,17 +43,6 @@ npm start
 #### Step 2: (Optional) Start a public tunnel in another terminal
 If you need access from outside your network:
 
-**Windows:**
-```powershell
-cloudflared tunnel --url http://localhost:11434
-```
-
-**Ubuntu/Linux:**
-```bash
-cloudflared tunnel --url http://localhost:11434
-```
-
-**macOS:**
 ```bash
 cloudflared tunnel --url http://localhost:11434
 ```
@@ -122,12 +88,6 @@ brew install cloudflared
 ```
 
 Then in a separate terminal:
-**Windows:**
-```powershell
-cloudflared tunnel --url http://localhost:11434
-```
-
-**Ubuntu/Linux/macOS:**
 ```bash
 cloudflared tunnel --url http://localhost:11434
 ```
@@ -137,12 +97,6 @@ Keep this running. The app will automatically detect the tunnel URL.
 ## Development
 
 ### Dev mode with DevTools
-**Windows:**
-```powershell
-npm run dev
-```
-
-**Ubuntu/Linux/macOS:**
 ```bash
 npm run dev
 ```
