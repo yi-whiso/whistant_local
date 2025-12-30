@@ -101,9 +101,39 @@ Keep this running. The app will automatically detect the tunnel URL.
 npm run dev
 ```
 
-## Windows Portable Build (from Linux)
+## Windows Build
 
-You can generate a standalone Windows portable `.exe` on Linux using `electron-builder` with Wine.
+### Building on Windows
+
+You can generate a standalone Windows portable `.exe` or installer directly on Windows.
+
+Prerequisites:
+- Windows 10+ with PowerShell
+- `electron-builder` already listed in `devDependencies`
+- Node.js and npm installed
+
+Build commands:
+
+```powershell
+# Build Windows portable x64
+npm run build:win:x64
+
+# Or generic portable (defaults to x64)
+npm run build:win
+```
+
+Output:
+- Files are placed under `dist/`.
+- Look for `Whistant Local Portable.exe` (name may vary by version/productName).
+
+Notes:
+- The portable build produces a single `.exe` that runs without installation.
+- Code signing is optional and not required for local/portable usage; unsigned binaries may trigger SmartScreen.
+- If you encounter issues, ensure you have the latest version of `electron-builder` and run `npm install` first.
+
+### Building from Linux (Cross-platform)
+
+You can also generate a Windows portable `.exe` on Linux using `electron-builder` with Wine.
 
 Prerequisites:
 - Wine and Mono for cross-building Squirrel/NSIS-free portable targets
@@ -127,14 +157,6 @@ npm run build:win:x64
 # Or generic portable (defaults to x64)
 npm run build:win
 ```
-
-Output:
-- Files are placed under `dist/`.
-- Look for `Whistant Local Portable.exe` (name may vary by version/productName).
-
-Notes:
-- The portable build produces a single `.exe` that runs without installation and without extra preparation on Windows.
-- Code signing is optional and not required for local/portable usage; unsigned binaries may trigger SmartScreen.
 
 ## macOS Build
 

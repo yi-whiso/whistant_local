@@ -1,7 +1,7 @@
 {
   "name": "whistant_local",
-  "version": "1.0.0",
-  "description": "Link your Ollama server to iPhone with Whistant",
+  "version": "1.0.1",
+  "description": "Link your Ollama server (Windows, Linux, Mac) to iPhone with Whistant",
   "main": "main.js",
   "author": "Whistant",
   "scripts": {
