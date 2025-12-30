@@ -220,13 +220,38 @@ async function loadSystemInfo() {
 			}
 			document.getElementById('code-graphics').textContent = graphicsText
 			
-			// Show driver/CUDA info only for NVIDIA
+			// Show GPU-specific details
+			const detail1 = document.getElementById('code-gpu-detail-1')
+			const detail2 = document.getElementById('code-gpu-detail-2')
+			const detail1Label = document.getElementById('code-gpu-detail-1-label')
+			const detail1Value = document.getElementById('code-gpu-detail-1-value')
+			const detail2Label = document.getElementById('code-gpu-detail-2-label')
+			const detail2Value = document.getElementById('code-gpu-detail-2-value')
+			
 			if (sysInfo.gpuType === 'nvidia') {
-				document.getElementById('code-nvidia-driver').textContent = sysInfo.nvidiaDriver || '-'
-				document.getElementById('code-cuda').textContent = sysInfo.cuda || '-'
+				// Show NVIDIA driver and CUDA
+				detail1.style.display = ''
+				detail2.style.display = ''
+				detail1Label.textContent = 'NVIDIA Driver:'
+				detail1Value.textContent = sysInfo.nvidiaDriver || 'Not available'
+				detail2Label.textContent = 'CUDA Version:'
+				detail2Value.textContent = sysInfo.cuda || 'Not available'
+			} else if (sysInfo.gpuType === 'amd' && sysInfo.amdInfo) {
+				// Show AMD info
+				detail1.style.display = ''
+				detail2.style.display = 'none'
+				detail1Label.textContent = 'AMD GPU:'
+				detail1Value.textContent = sysInfo.amdInfo.name || 'AMD GPU detected'
+			} else if (sysInfo.gpuType === 'mac' && sysInfo.macInfo) {
+				// Show Mac Metal info
+				detail1.style.display = ''
+				detail2.style.display = 'none'
+				detail1Label.textContent = 'Metal Support:'
+				detail1Value.textContent = sysInfo.macInfo.metal ? 'Supported' : 'Not supported'
 			} else {
-				document.getElementById('code-nvidia-driver').textContent = 'N/A'
-				document.getElementById('code-cuda').textContent = 'N/A'
+				// Hide GPU details if no specific info
+				detail1.style.display = 'none'
+				detail2.style.display = 'none'
 			}
 			
 			document.getElementById('code-url').textContent = sysInfo.url || '-'
@@ -265,6 +290,9 @@ async function loadSuccessSystemInfo() {
 			const detail1Value = document.getElementById('success-gpu-detail-1-value')
 			const detail2Label = document.getElementById('success-gpu-detail-2-label')
 			const detail2Value = document.getElementById('success-gpu-detail-2-value')
+			
+			console.log('GPU Type detected:', sysInfo.gpuType)
+			console.log('Mac Info:', sysInfo.macInfo)
 			
 			if (sysInfo.gpuType === 'nvidia') {
 				// Show NVIDIA driver and CUDA
