@@ -361,29 +361,122 @@ async function checkCloudflaredTunnel() {
 }
 
 /**
+ * Get cloudflared executable path
+ * Checks bundled binary first, then falls back to system installation
+ */
+function getCloudflaredPath() {
+	const platform = os.platform()
+	const arch = os.arch()
+	
+	// Determine platform-specific directory name
+	let platformDir = null
+	if (platform === 'darwin') {
+		platformDir = arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64'
+	} else if (platform === 'linux') {
+		platformDir = 'linux-x64'
+	} else if (platform === 'win32') {
+		platformDir = 'win32-x64'
+	}
+	
+	if (platformDir) {
+		// Check for bundled binary in development or production
+		const exeName = platform === 'win32' ? 'cloudflared.exe' : 'cloudflared'
+		
+		// Try production path FIRST (inside app.asar.unpacked) - most common for packaged apps
+		const prodPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'bin', platformDir, exeName)
+		if (fs.existsSync(prodPath)) {
+			console.log('✅ Using bundled cloudflared from production path:', prodPath)
+			return prodPath
+		}
+		
+		// Try development path (only works when running with npm start)
+		// Use __dirname.replace to get unpacked path if we're inside asar
+		let devPath = path.join(__dirname, 'bin', platformDir, exeName)
+		// If __dirname contains app.asar, try the unpacked version
+		if (__dirname.includes('app.asar') && !__dirname.includes('app.asar.unpacked')) {
+			devPath = devPath.replace('app.asar', 'app.asar.unpacked')
+		}
+		if (fs.existsSync(devPath)) {
+			console.log('✅ Using bundled cloudflared from development path:', devPath)
+			return devPath
+		}
+		
+		// Try another production path (not packed in asar - for Linux AppImage)
+		const prodPath2 = path.join(process.resourcesPath, 'bin', platformDir, exeName)
+		if (fs.existsSync(prodPath2)) {
+			console.log('✅ Using bundled cloudflared from production path:', prodPath2)
+			return prodPath2
+		}
+		
+		// For macOS app bundle: Try app/bin path
+		if (platform === 'darwin') {
+			const macPath = path.join(process.resourcesPath, 'app', 'bin', platformDir, exeName)
+			if (fs.existsSync(macPath)) {
+				console.log('✅ Using bundled cloudflared from macOS app path:', macPath)
+				return macPath
+			}
+		}
+		
+		// Log all paths tried for debugging
+		console.log('⚠️  Tried cloudflared paths:')
+		console.log('   - Dev:', devPath)
+		console.log('   - Prod (asar.unpacked):', prodPath)
+		console.log('   - Prod (resources):', prodPath2)
+		if (platform === 'darwin') {
+			console.log('   - macOS app:', path.join(process.resourcesPath, 'app', 'bin', platformDir, exeName))
+		}
+		console.log('   process.resourcesPath:', process.resourcesPath)
+		console.log('   __dirname:', __dirname)
+	}
+	
+	// Fall back to system installation
+	console.log('⚠️  Bundled cloudflared not found, checking system installation...')
+	return 'cloudflared' // Will use system PATH
+}
+
+/**
  * Start cloudflared quick tunnel to localhost:11434
  */
 async function startCloudflaredTunnel() {
 	try {
-		// Check if cloudflared is installed
+		const cloudflaredPath = getCloudflaredPath()
+		
+		// For bundled binaries, ensure executable permissions (Unix-like systems)
+		if (fs.existsSync(cloudflaredPath) && cloudflaredPath !== 'cloudflared') {
+			try {
+				const stats = fs.statSync(cloudflaredPath)
+				// Check if file is not executable, then make it executable
+				if (os.platform() !== 'win32' && !(stats.mode & fs.constants.S_IXUSR)) {
+					console.log('🔧 Setting executable permissions on cloudflared binary...')
+					fs.chmodSync(cloudflaredPath, 0o755)
+				}
+			} catch (permError) {
+				console.warn('⚠️  Could not set executable permissions:', permError.message)
+			}
+		}
+		
+		// Check if cloudflared is available
 		try {
-			execSync('cloudflared --version', { 
+			execSync(`"${cloudflaredPath}" --version`, { 
 				encoding: 'utf-8',
 				stdio: 'pipe',
 			})
-			console.log('✅ cloudflared is installed')
+			console.log('✅ cloudflared is available:', cloudflaredPath)
 		} catch (e) {
 			const isWindows = os.platform() === 'win32'
-			const installCmd = isWindows ? 'winget install --id Cloudflare.cloudflared' : 'sudo apt install cloudflared'
-			console.warn(`⚠️  cloudflared not found. Install with: ${installCmd}`)
+			const installCmd = isWindows ? 'winget install --id Cloudflare.cloudflared' : 
+			                    os.platform() === 'darwin' ? 'brew install cloudflared' : 
+			                    'sudo apt install cloudflared'
+			console.warn(`❌ cloudflared not found. Install with: ${installCmd}`)
+			console.warn('   Or download binaries manually - see bin/README.md')
 			return null
 		}
 
 		console.log('📡 Starting cloudflared tunnel in background...')
 
-		// Start cloudflared tunnel
+		// Start cloudflared tunnel using detected path
 		// cloudflared tunnel --url http://localhost:11434
-		cloudflaredProcess = spawn('cloudflared', [
+		cloudflaredProcess = spawn(cloudflaredPath, [
 			'tunnel',
 			'--url', OLLAMA_SERVER_URL
 		], {

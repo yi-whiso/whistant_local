@@ -33,12 +33,16 @@
     "appId": "com.whistant.local",
     "productName": "Whistant_Local",
     "asar": true,
+    "asarUnpack": [
+      "bin/**/*"
+    ],
     "compression": "maximum",
     "files": [
       "main.js",
       "preload.js",
       "config/defaults.json",
       "ui/**/*",
+      "bin/**/*",
       "package.json",
       "!dist/**",
       "!.git/**",

@@ -9,3 +9,7 @@ dist/
 *~
 .vscode/
 .idea/
+
+# Cloudflared binaries (too large for git)
+bin/*/cloudflared
+bin/*/cloudflared.exe
