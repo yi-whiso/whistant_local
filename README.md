@@ -9,7 +9,7 @@ Register your Ollama server with the Whistant iPhone app using a link code.
 - **Ollama**: Running on localhost:11434
 - **Models**: For good performance, suggest agent model gpt-oss:20b, reasoning model deepseek-r1:14b
 - **Cloudflared**: For remote access
-- **GPU**: Nvidia GPU with 24 GB or larger graphic memory (recommended); driver and CUDA ready. For Mac, Apple Silicon with 24 GB+ unified memory recommended
+- **GPU**: Nvidia GPU with 24 GB or larger graphic memory (recommended); driver and CUDA ready. AMD GPU with 24 GB+ graphic memory. For Mac, Apple Silicon with 24 GB+ unified memory recommended.
 - **Node.js**: v16+ with npm installed
 
 ### Platform-Specific Requirements
@@ -40,22 +40,15 @@ Note: Use `c:\Users\xxx\whistant_local` on Windows, `~/whistant_local` on Linux/
 npm start
 ```
 
-#### Step 2: (Optional) Start a public tunnel in another terminal
-If you need access from outside your network:
-
-```bash
-cloudflared tunnel --url http://localhost:11434
-```
-
-#### Step 3: Register in the app
-1. Get a 6-character link code from your iPhone's Whistant app
+#### Step 2: Register in the app
+1. Get a 6-character link code from your iPhone's Whistant app (Settings -> Private Server)
 2. Paste it in the desktop app
 3. Click "Register Server"
 4. Done!
 
 ## How It Works
 
-1. **iPhone app generates link code** - User taps "Link Ollama Server" on iPhone
+1. **iPhone app generates link code** - User taps "Refresh Link Code" on iPhone
 2. **Desktop app receives link code** - User enters the code in the registration UI
 3. **App sends registration** - Sends link code + server info to whistant server
 4. **Server validates & binds** - whistant server matches link code to user and stores server info
@@ -66,31 +59,6 @@ cloudflared tunnel --url http://localhost:11434
 The app header shows:
 - **Ollama**: ✅ (running) | ❌ (not running)
 - **Tunnel**: ✅ (public tunnel active) | ⚠️ (using localhost only)
-
-## Tunnel Setup
-
-For public access from anywhere (recommended):
-
-### Cloudflared (Recommended)
-**Windows:**
-```powershell
-scoop install cloudflared
-```
-
-**Ubuntu/Linux:**
-```bash
-sudo apt install cloudflared
-```
-
-**macOS:**
-```bash
-brew install cloudflared
-```
-
-Then in a separate terminal:
-```bash
-cloudflared tunnel --url http://localhost:11434
-```
 
 Keep this running. The app will automatically detect the tunnel URL.
 
@@ -104,8 +72,6 @@ npm run dev
 ## Windows Build
 
 ### Building on Windows
-
-You can generate a standalone Windows portable `.exe` or installer directly on Windows.
 
 Prerequisites:
 - Windows 10+ with PowerShell
@@ -124,12 +90,8 @@ npm run build:win
 
 Output:
 - Files are placed under `dist/`.
-- Look for `Whistant Local Portable.exe` (name may vary by version/productName).
+- Look for `whistant_local.exe` (name may vary by version/productName).
 
-Notes:
-- The portable build produces a single `.exe` that runs without installation.
-- Code signing is optional and not required for local/portable usage; unsigned binaries may trigger SmartScreen.
-- If you encounter issues, ensure you have the latest version of `electron-builder` and run `npm install` first.
 
 ### Building from Linux (Cross-platform)
 
@@ -194,15 +156,24 @@ Notes:
 whistant_local/
 ├── main.js              # Electron main process  
 ├── preload.js           # Electron IPC bridge
-├── server.js            # Local Ollama proxy
 ├── package.json         # Dependencies
+├── bin/                 # Bundled cloudflared binaries
+│   ├── darwin-arm64/    # macOS Apple Silicon
+│   ├── darwin-x64/      # macOS Intel
+│   ├── linux-x64/       # Linux x64
+│   └── win32-x64/       # Windows x64
+├── config/
+│   └── defaults.json    # Default configuration
+├── scripts/
+│   ├── convert-icon.js  # Icon conversion utility
+│   └── download-cloudflared.sh  # Binary download script
 ├── ui/
 │   ├── index.html       # Registration UI
 │   ├── app.js           # UI logic
 │   └── styles.css       # Styling
 ├── README.md            # This file
-├── TUNNEL_SETUP.md      # Detailed tunnel guide
-└── .env                 # Configuration
+├── .env                 # Configuration (optional)
+└── .env.example         # Example configuration
 ```
 
 ## Troubleshooting
