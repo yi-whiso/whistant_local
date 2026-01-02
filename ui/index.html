@@ -10,8 +10,8 @@
 	<div class="app">
 		<!-- Header -->
 		<header class="header">
-			<div class="logo">Whistant Server</div>
-			<div class="subtitle">Link Ollama Server to iPhone Task</div>
+			<div class="logo">Server</div>
+			<div class="subtitle">Link Ollama Server to iPhone</div>
 			<div class="status-bar">
 				<div class="status-item">
 					<span class="status-icon" id="ollama-status">⏳</span>
@@ -55,7 +55,7 @@
 			<div class="icon">🔑</div>
 
 			<h2>Enter Link Code</h2>
-			<p>Open Whistant on your iPhone and get your link code</p>
+			<p>Get code from Whistant on your iPhone</p>
 
 			<div class="form">
 				<input 
@@ -78,36 +78,36 @@
 
 			<div class="success-info" style="margin-top: 20px;">
 				<div class="info-item">
+					<span class="label">URL:</span>
+					<span class="value" id="success-url">-</span>
+				</div>
+				<div class="info-item">
 					<span class="label">OS:</span>
-					<span class="value" id="code-os">-</span>
+					<span class="value" id="success-os">-</span>
 				</div>
 				<div class="info-item">
 					<span class="label">Device:</span>
-					<span class="value" id="code-device">-</span>
+					<span class="value" id="success-device">-</span>
 				</div>
 				<div class="info-item">
 					<span class="label">CPU:</span>
-					<span class="value" id="code-cpu">-</span>
+					<span class="value" id="success-cpu">-</span>
 				</div>
 				<div class="info-item">
 					<span class="label">Memory:</span>
-					<span class="value" id="code-memory">-</span>
+					<span class="value" id="success-memory">-</span>
 				</div>
 				<div class="info-item">
 					<span class="label">Graphics:</span>
-					<span class="value" id="code-graphics">-</span>
+					<span class="value" id="success-graphics">-</span>
 				</div>
-				<div class="info-item" id="code-gpu-detail-1">
-					<span class="label" id="code-gpu-detail-1-label">GPU Detail 1:</span>
-					<span class="value" id="code-gpu-detail-1-value">-</span>
+				<div class="info-item" id="success-gpu-detail-1">
+					<span class="label" id="success-gpu-detail-1-label">GPU Detail 1:</span>
+					<span class="value" id="success-gpu-detail-1-value">-</span>
 				</div>
-				<div class="info-item" id="code-gpu-detail-2">
-					<span class="label" id="code-gpu-detail-2-label">GPU Detail 2:</span>
-					<span class="value" id="code-gpu-detail-2-value">-</span>
-				</div>
-				<div class="info-item">
-					<span class="label">Tunnel URL:</span>
-					<span class="value" id="code-url">-</span>
+				<div class="info-item" id="success-gpu-detail-2">
+					<span class="label" id="success-gpu-detail-2-label">GPU Detail 2:</span>
+					<span class="value" id="success-gpu-detail-2-value">-</span>
 				</div>
 			</div>
 		</div>
@@ -122,8 +122,8 @@
 
 				<div class="icon">✅</div>
 
-			<h2>Server Linked!</h2>
-			<p>Your Ollama server is now connected to Whistant</p>
+			<h2>Server Linked</h2>
+			<p>Server is now connected to Whistant</p>
 
 			<button class="btn btn-secondary" onclick="unlinkServer()" style="margin-top: 10px; margin-bottom: 16px;">Unlink Server</button>
 
