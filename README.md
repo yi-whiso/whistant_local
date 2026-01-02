@@ -16,7 +16,7 @@ Register your Ollama server with the Whistant iPhone app using a link code.
 
 #### Windows
 - PowerShell
-- Install cloudflared: `scoop install cloudflared`
+- Install cloudflared: `winget install cloudflared`
 
 #### Ubuntu/Linux
 - Bash terminal
