@@ -238,6 +238,172 @@ function getMacInfo() {
 	}
 }
 
+/**
+ * Check if Ollama is running
+ */
+function isOllamaRunning() {
+	try {
+		const platform = os.platform()
+		let command = ''
+		
+		if (platform === 'win32') {
+			// Windows: Check if ollama.exe process is running
+			command = 'tasklist | find /i "ollama"'
+		} else {
+			// macOS/Linux: Check for ollama processes
+			command = 'ps aux | grep -i ollama | grep -v grep'
+		}
+		
+		try {
+			const output = execSync(command, { encoding: 'utf-8', stdio: 'pipe' })
+			return output.trim().length > 0
+		} catch (e) {
+			return false
+		}
+	} catch (e) {
+		console.warn('Error checking if Ollama is running:', e.message)
+		return false
+	}
+}
+
+/**
+ * Stop Ollama gracefully
+ */
+function stopOllama() {
+	try {
+		const platform = os.platform()
+		
+		if (platform === 'win32') {
+			console.log('🛑 Stopping Ollama on Windows...')
+			execSync('taskkill /IM ollama.exe /F', { stdio: 'pipe' })
+		} else {
+			console.log('🛑 Stopping Ollama on Unix...')
+			// Kill ollama serve process gracefully, then force if needed
+			try {
+				execSync('pkill -f "ollama serve"', { stdio: 'pipe' })
+			} catch (e) {
+				// pkill failed, try killall
+				try {
+					execSync('killall ollama', { stdio: 'pipe' })
+				} catch (e2) {
+					console.warn('⚠️  Could not kill Ollama process')
+				}
+			}
+		}
+		
+		// Wait a bit for graceful shutdown
+		console.log('⏳ Waiting for Ollama to stop...')
+		execSync('sleep 2', { stdio: 'pipe' })
+		
+		console.log('✅ Ollama stopped')
+		return true
+	} catch (error) {
+		console.warn('⚠️  Error stopping Ollama:', error.message)
+		return false
+	}
+}
+
+/**
+ * Start Ollama with OLLAMA_HOST=0.0.0.0:11434
+ */
+function startOllamaWithPublicHost() {
+	try {
+		const platform = os.platform()
+		console.log('🚀 Starting Ollama with public host binding (0.0.0.0:11434)...')
+		
+		// Create environment with OLLAMA_HOST set
+		const env = {
+			...process.env,
+			OLLAMA_HOST: '0.0.0.0:11434'
+		}
+		
+		if (platform === 'win32') {
+			// Windows: Start ollama serve in background
+			console.log('Starting Ollama serve on Windows...')
+			spawn('ollama', ['serve'], {
+				detached: true,
+				stdio: 'ignore',
+				env: env,
+				windowsHide: true,
+			}).unref()
+		} else {
+			// macOS/Linux: Start ollama serve in background with nohup
+			const command = 'nohup ollama serve > /tmp/ollama.log 2>&1 &'
+			execSync(command, {
+				env: env,
+				shell: true,
+				stdio: 'pipe',
+			})
+
+			
+		}
+		
+		console.log('📡 Ollama starting with OLLAMA_HOST=0.0.0.0:11434')
+		return true
+	} catch (error) {
+		console.error('❌ Error starting Ollama:', error.message)
+		return false
+	}
+}
+
+/**
+ * Configure Ollama to accept remote connections
+ * Stops running Ollama instance and restarts with proper host binding
+ */
+async function configureOllamaForRemote() {
+	try {
+		console.log('🔧 Configuring Ollama for remote access...')
+		
+		const isRunning = isOllamaRunning()
+		
+		if (isRunning) {
+			console.log('Found running Ollama instance, stopping it...')
+			const stopped = stopOllama()
+			if (!stopped) {
+				console.warn('⚠️  Could not stop existing Ollama, attempting to restart anyway...')
+			}
+		} else {
+			console.log('ℹ️  Ollama is not currently running')
+		}
+		
+		// Wait a moment before restarting
+		await new Promise(resolve => setTimeout(resolve, 1000))
+		
+		// Start Ollama with proper host binding
+		const started = startOllamaWithPublicHost()
+		
+		if (started) {
+			// Wait for Ollama to be ready
+			console.log('⏳ Waiting for Ollama to start (up to 30 seconds)...')
+			
+			let attempts = 0
+			const maxAttempts = 30
+			
+			while (attempts < maxAttempts) {
+				try {
+					const response = await axios.get(`${OLLAMA_SERVER_URL}/api/tags`, { timeout: 2000 })
+					if (response.status === 200) {
+						console.log('✅ Ollama is ready and accessible from all IPs (0.0.0.0:11434)')
+						return { success: true }
+					}
+				} catch (e) {
+					// Still starting
+					attempts++
+					await new Promise(resolve => setTimeout(resolve, 1000))
+				}
+			}
+			
+			console.warn('⚠️  Ollama started but not responding yet (may take a moment)')
+			return { success: true, message: 'Ollama started but still initializing' }
+		} else {
+			return { success: false, error: 'Failed to start Ollama' }
+		}
+	} catch (error) {
+		console.error('Configuration error:', error.message)
+		return { success: false, error: error.message }
+	}
+}
+
 
 
 /**
@@ -719,6 +885,16 @@ function createWindow() {
  */
 app.on('ready', async () => {
 	createWindow()
+	
+	// Configure Ollama for remote access on startup
+	console.log('⚙️  Configuring Ollama for remote access on startup...')
+	const configResult = await configureOllamaForRemote()
+	if (configResult.success) {
+		console.log('✅ Ollama configured successfully')
+	} else {
+		console.warn('⚠️  Ollama configuration failed, but app will continue:', configResult.error)
+	}
+	
 	// Start cloudflared tunnel in background
 	const tunnelUrl = await startCloudflaredTunnel()
 	if (tunnelUrl) {
@@ -1104,5 +1280,20 @@ ipcMain.handle('focus-window', async () => {
 	} catch (error) {
 		console.error('focus-window error:', error.message)
 		return { success: false, error: error.message }
+	}
+})
+
+// Configure Ollama to accept remote connections
+ipcMain.handle('configure-ollama-remote', async (event) => {
+	try {
+		console.log('📡 User triggered Ollama remote configuration...')
+		const result = await configureOllamaForRemote()
+		return result
+	} catch (error) {
+		console.error('Configuration error:', error.message)
+		return {
+			success: false,
+			error: error.message || 'Failed to configure Ollama'
+		}
 	}
 })
