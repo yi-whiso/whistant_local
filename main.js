@@ -304,12 +304,71 @@ function stopOllama() {
 }
 
 /**
+ * Find ollama executable path
+ */
+function findOllamaExecutable() {
+	const platform = os.platform()
+	const home = os.homedir()
+	
+	// Common installation paths for ollama
+	const searchPaths = platform === 'win32'
+		? [
+			'ollama',
+			path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Ollama', 'ollama.exe'),
+			'C:\\Program Files\\Ollama\\ollama.exe',
+		]
+		: platform === 'darwin'
+		? [
+			'ollama',
+			'/usr/local/bin/ollama',
+			'/opt/homebrew/bin/ollama',
+			path.join(home, '.ollama', 'bin', 'ollama'),
+		]
+		: [
+			'ollama',
+			'/usr/local/bin/ollama',
+			'/usr/bin/ollama',
+			path.join(home, '.ollama', 'bin', 'ollama'),
+		]
+	
+	// Try to find ollama
+	for (const ollamaPath of searchPaths) {
+		if (ollamaPath === 'ollama') {
+			try {
+				// Test if ollama is in PATH
+				const result = execSync('which ollama 2>/dev/null || where ollama 2>nul', {
+					encoding: 'utf-8',
+					stdio: 'pipe',
+					shell: true,
+				}).trim()
+				if (result) {
+					console.log(`✅ Found ollama in PATH: ${result}`)
+					return result
+				}
+			} catch (e) {
+				// Not in PATH
+			}
+		} else if (fs.existsSync(ollamaPath)) {
+			console.log(`✅ Found ollama at: ${ollamaPath}`)
+			return ollamaPath
+		}
+	}
+	
+	console.warn('⚠️  Could not find ollama executable in common paths')
+	return 'ollama' // Fallback to hoping it's in PATH
+}
+
+/**
  * Start Ollama with OLLAMA_HOST=0.0.0.0:11434
  */
 function startOllamaWithPublicHost() {
 	try {
 		const platform = os.platform()
 		console.log('🚀 Starting Ollama with public host binding (0.0.0.0:11434)...')
+		
+		// Find ollama executable
+		const ollamaPath = findOllamaExecutable()
+		console.log(`Using ollama at: ${ollamaPath}`)
 		
 		// Create environment with OLLAMA_HOST set
 		const env = {
@@ -320,7 +379,7 @@ function startOllamaWithPublicHost() {
 		if (platform === 'win32') {
 			// Windows: Start ollama serve in background
 			console.log('Starting Ollama serve on Windows...')
-			spawn('ollama', ['serve'], {
+			spawn(ollamaPath, ['serve'], {
 				detached: true,
 				stdio: 'ignore',
 				env: env,
@@ -328,7 +387,14 @@ function startOllamaWithPublicHost() {
 			}).unref()
 		} else {
 			// macOS/Linux: Start ollama serve in background with nohup
-			const command = 'nohup ollama serve > /tmp/ollama.log 2>&1 &'
+			const logPath = path.join(os.homedir(), '.whistant_local', 'ollama.log')
+			const logDir = path.dirname(logPath)
+			if (!fs.existsSync(logDir)) {
+				fs.mkdirSync(logDir, { recursive: true })
+			}
+			
+			const command = `OLLAMA_HOST=0.0.0.0:11434 nohup "${ollamaPath}" serve > "${logPath}" 2>&1 &`
+			console.log(`📝 Ollama logs will be written to: ${logPath}`)
 			execSync(command, {
 				env: env,
 				shell: true,
@@ -342,6 +408,7 @@ function startOllamaWithPublicHost() {
 		return true
 	} catch (error) {
 		console.error('❌ Error starting Ollama:', error.message)
+		console.error('Stack trace:', error.stack)
 		return false
 	}
 }
@@ -1295,5 +1362,20 @@ ipcMain.handle('configure-ollama-remote', async (event) => {
 			success: false,
 			error: error.message || 'Failed to configure Ollama'
 		}
+	}
+})
+
+// Get Ollama logs for debugging
+ipcMain.handle('get-ollama-logs', async (event) => {
+	try {
+		const logPath = path.join(os.homedir(), '.whistant_local', 'ollama.log')
+		if (fs.existsSync(logPath)) {
+			const logs = fs.readFileSync(logPath, 'utf-8')
+			return { success: true, logs: logs }
+		} else {
+			return { success: true, logs: 'No logs found yet. Ollama may not have been started.' }
+		}
+	} catch (error) {
+		return { success: false, error: error.message }
 	}
 })
