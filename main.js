@@ -900,9 +900,16 @@ async function monitorServices() {
  * Create the browser window
  */
 function createWindow() {
-	const iconPath = path.join(__dirname, 'ui', 'appicon.png')
+	// Use .ico on Windows, .png on Linux (macOS icon comes from app bundle)
+	let iconPath
+	if (process.platform === 'win32') {
+		iconPath = path.join(__dirname, 'ui', 'icon.ico')
+	} else if (process.platform !== 'darwin') {
+		iconPath = path.join(__dirname, 'ui', 'appicon.png')
+	}
+	
 	const windowOptions = {
-		width: 600,
+		width: 500,
 		height: 800,
 		webPreferences: {
 			preload: path.join(__dirname, 'preload.js'),
@@ -912,8 +919,8 @@ function createWindow() {
 		},
 	}
 	
-	// Set icon if file exists (Linux requires icon to be set)
-	if (fs.existsSync(iconPath)) {
+	// Set icon if file exists (but not on macOS - it comes from app bundle)
+	if (iconPath && fs.existsSync(iconPath)) {
 		windowOptions.icon = iconPath
 	}
 	
