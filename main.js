@@ -957,29 +957,33 @@ function createWindow() {
 /**
  * App event handlers
  */
-app.on('ready', async () => {
+app.on('ready', () => {
 	createWindow()
-	
-	// Configure Ollama for remote access on startup
-	console.log('⚙️  Configuring Ollama for remote access on startup...')
-	const configResult = await configureOllamaForRemote()
-	if (configResult.success) {
-		console.log('✅ Ollama configured successfully')
-	} else {
-		console.warn('⚠️  Ollama configuration failed, but app will continue:', configResult.error)
-	}
-	
-	// Start cloudflared tunnel in background
-	const tunnelUrl = await startCloudflaredTunnel()
-	if (tunnelUrl) {
-		console.log('📡 Tunnel is ready for use:', tunnelUrl)
-	} else {
-		console.warn('⚠️  No tunnel available, will use localhost')
-	}
 	
 	// Start service monitoring every 30 minutes (1800000 ms)
 	setInterval(monitorServices, 1800000)
 	console.log('🔍 Service monitoring started (every 30 minutes)')
+	
+	// Fire off Ollama/cloudflared in background WITHOUT blocking UI
+	configureOllamaForRemote()
+		.then(configResult => {
+			if (configResult.success) {
+				console.log('✅ Ollama configured successfully')
+			} else {
+				console.warn('⚠️  Ollama configuration failed, but app will continue:', configResult.error)
+			}
+		})
+		.catch(e => console.error('Error configuring Ollama:', e))
+	
+	startCloudflaredTunnel()
+		.then(tunnelUrl => {
+			if (tunnelUrl) {
+				console.log('📡 Tunnel is ready for use:', tunnelUrl)
+			} else {
+				console.warn('⚠️  No tunnel available, will use localhost')
+			}
+		})
+		.catch(e => console.error('Error starting cloudflared:', e))
 })
 
 app.on('window-all-closed', () => {
