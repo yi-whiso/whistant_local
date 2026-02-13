@@ -36,7 +36,7 @@
     "asarUnpack": [
       "bin/**/*"
     ],
-    "compression": "maximum",
+    "compression": "store",
     "files": [
       "main.js",
       "preload.js",
@@ -71,6 +71,9 @@
       "category": "Network",
       "icon": "ui/icon.png",
       "maintainer": "Whisolla <contact@whisolla.com>"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}.${ext}"
     },    "mac": {
       "target": [
         "dmg",
