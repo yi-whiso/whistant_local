@@ -26,4 +26,8 @@ contextBridge.exposeInMainWorld('whistant', {
 
 	// Window focus helper to recover input interactivity
 	focusWindow: () => ipcRenderer.invoke('focus-window'),
+
+	// Event listeners - allow renderer to listen to events from main process
+	on: (channel, listener) => ipcRenderer.on(channel, listener),
+	off: (channel, listener) => ipcRenderer.off(channel, listener),
 })
