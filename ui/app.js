@@ -102,6 +102,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 		document.getElementById('success-os').textContent = registration.os || '-'
 		document.getElementById('success-device').textContent = registration.device || '-'
 		showScreen('screen-success')
+
 		// Load system info and display models list on success screen
 		await loadSuccessSystemInfo()
 		await displayModelsListOnSuccess()
@@ -411,6 +412,15 @@ async function submitLinkCode() {
 			document.getElementById('success-url').textContent = registerResult.data.url || '-'
 			document.getElementById('success-os').textContent = registerResult.data.os || '-'
 			document.getElementById('success-device').textContent = registerResult.data.device || '-'
+			
+			// Set success message (can be overridden by warning listener if issues occur)
+			const successMessage = document.getElementById('success-message')
+			if (successMessage) {
+				successMessage.textContent = 'Server is now connected to Whistant'
+				successMessage.style.color = '#4caf50'
+				successMessage.style.fontWeight = '500'
+			}
+			
 			showScreen('screen-success')
 			// Load system info and display models list on success screen
 			await loadSuccessSystemInfo()
