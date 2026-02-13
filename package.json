@@ -1,6 +1,6 @@
 {
   "name": "whistant_local",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Link your Ollama server (Windows, Linux, Mac) to iPhone with Whistant",
   "main": "main.js",
   "author": "Whistant",
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "electron": "^39.2.5",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^26.7.0"
   },
   "build": {
     "appId": "com.whistant.local",
@@ -74,7 +74,8 @@
     },
     "appImage": {
       "artifactName": "${productName}-${version}.${ext}"
-    },    "mac": {
+    },
+    "mac": {
       "target": [
         "dmg",
         "zip"
@@ -84,7 +85,8 @@
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "identity": null
-    },    "directories": {
+    },
+    "directories": {
       "output": "dist"
     }
   }
