@@ -51,10 +51,43 @@ function enableLinkCodeInput() {
 }
 
 /**
+ * Handle registration warnings from main process
+ */
+function setupRegistrationWarningListener() {
+	window.whistant.on('registration-warning', (event, data) => {
+		const { reason, detail } = data
+		console.warn(`⚠️  Registration warning: ${reason} - ${detail}`)
+		
+		// Update the success message if on success screen
+		const successMessage = document.getElementById('success-message')
+		if (successMessage) {
+			// Display warning message replacing the current message permanently
+			let displayMessage = '⚠️ '
+			
+			if (reason === 'server-url-update-failed') {
+				displayMessage += 'Server URL update failed: ' + (detail || 'Could not update server URL')
+			} else {
+				displayMessage += detail || 'An issue occurred during registration'
+			}
+			
+			successMessage.textContent = displayMessage
+			successMessage.style.color = '#ff9800'
+			successMessage.style.fontWeight = '500'
+		}
+		
+		// Also log to console for debugging
+		console.log(`📝 Warning details - Reason: ${reason}, Detail: ${detail}`)
+	})
+}
+
+/**
  * Initialize app on load
  */
 window.addEventListener('DOMContentLoaded', async () => {
 	console.log('🚀 Whistant starting...')
+
+	// Set up registration warning listener
+	setupRegistrationWarningListener()
 
 	// Start monitoring services in background
 	startStatusMonitoring()

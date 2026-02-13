@@ -289,3 +289,14 @@ p {
 .step.done {
 	background: #4caf50;
 }
+/* Animation for registration warning notifications */
+@keyframes slideIn {
+	from {
+		transform: translateX(400px);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}

@@ -846,6 +846,19 @@ async function updateServerUrlIfRegistered(newUrl) {
 		if (error.response?.data) {
 			console.error('Server response:', JSON.stringify(error.response.data, null, 2))
 		}
+		notifyRegistrationWarning('server-url-update-failed', error.response?.data?.error || error.response?.data?.code || error.message)
+	}
+}
+
+function notifyRegistrationWarning(reason, detail) {
+	try {
+		if (mainWindow?.webContents) {
+			mainWindow.webContents.send('registration-warning', { reason, detail })
+		} else {
+			console.warn('⚠️  No renderer window available to show registration warning')
+		}
+	} catch (notifyError) {
+		console.warn('⚠️  Failed to notify renderer of registration warning:', notifyError.message)
 	}
 }
 
