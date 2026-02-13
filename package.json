@@ -60,8 +60,7 @@
           ]
         }
       ],
-      "icon": "ui/icon.ico",
-      "publisherName": "Whisolla <contact@whisolla.com>"
+      "icon": "ui/icon.ico"
     },
     "linux": {
       "target": [
