@@ -43,7 +43,7 @@ function loadEnv() {
 loadEnv()
 
 // Load built-in defaults and then overlay environment variables
-let DEFAULTS = { WHISTANT_SERVER_URL: 'https://whisolla.com:2087', OLLAMA_SERVER_URL: 'http://127.0.0.1:11434' }
+let DEFAULTS = { WHISTANT_SERVER_URL: 'https://whisolla.com:2087', OLLAMA_SERVER_URL: 'http://localhost:11434' }
 try {
 	const defaultsPath = path.join(__dirname, 'config', 'defaults.json')
 	if (fs.existsSync(defaultsPath)) {
