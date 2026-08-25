@@ -59,18 +59,76 @@ try {
 const WHISTANT_SERVER_URL = process.env.WHISTANT_SERVER_URL || DEFAULTS.WHISTANT_SERVER_URL
 const OLLAMA_SERVER_URL = process.env.OLLAMA_SERVER_URL || DEFAULTS.OLLAMA_SERVER_URL
 
+function formatBytes(bytes) {
+	if (!Number.isFinite(bytes) || bytes < 0) return 'Not available'
+	return `${(bytes / (1024 ** 3)).toFixed(2)} GB`
+}
+
+function parseInteger(value) {
+	const parsed = Number.parseInt(String(value).replace(/[^\d]/g, ''), 10)
+	return Number.isFinite(parsed) ? parsed : null
+}
+
+function mebibytesToBytes(value) {
+	const parsed = parseInteger(value)
+	return parsed === null ? null : parsed * (1024 ** 2)
+}
+
+function readIntegerFile(filePath) {
+	try {
+		return parseInteger(fs.readFileSync(filePath, 'utf-8'))
+	} catch {
+		return null
+	}
+}
+
+function createUnavailableGpu(name, extra = {}) {
+	return {
+		name,
+		memory: 'N/A',
+		memoryType: 'dedicated',
+		memoryTotalBytes: null,
+		memoryUsedBytes: null,
+		memoryFreeBytes: null,
+		freeMemoryExact: false,
+		devices: [],
+		available: false,
+		sampledAt: new Date().toISOString(),
+		...extra,
+	}
+}
+
 /**
  * Get NVIDIA driver and CUDA version
  */
 function getNvidiaInfo() {
 	try {
-		// Get GPU info
-		const output = execSync('nvidia-smi --query-gpu=driver_version,name,memory.total --format=csv,noheader', {
+		const output = execSync('nvidia-smi --query-gpu=index,uuid,driver_version,name,memory.total,memory.used,memory.free --format=csv,noheader,nounits', {
 			encoding: 'utf-8',
 			timeout: 5000,
 		}).trim()
-		
-		const [driverVersion, gpuName, gpuMemory] = output.split(',').map(s => s.trim())
+
+		const devices = output.split(/\r?\n/).filter(Boolean).map(line => {
+			const [index, uuid, driverVersion, name, totalMiB, usedMiB, freeMiB] = line.split(',').map(value => value.trim())
+			const memoryTotalBytes = mebibytesToBytes(totalMiB)
+			const memoryUsedBytes = mebibytesToBytes(usedMiB)
+			const memoryFreeBytes = mebibytesToBytes(freeMiB)
+			return {
+				index: parseInteger(index),
+				uuid,
+				name,
+				driverVersion,
+				memoryType: 'dedicated',
+				memoryTotalBytes,
+				memoryUsedBytes,
+				memoryFreeBytes,
+				freeMemoryExact: [memoryTotalBytes, memoryUsedBytes, memoryFreeBytes].every(value => value !== null),
+				source: 'nvidia-smi',
+			}
+		})
+
+		if (devices.length === 0) throw new Error('nvidia-smi returned no GPUs')
+		const primary = devices[0]
 		
 		// Get CUDA version from nvidia-smi
 		let cudaVersion = 'Not available'
@@ -89,21 +147,113 @@ function getNvidiaInfo() {
 		}
 		
 		return {
-			driver: driverVersion || 'Not available',
+			driver: primary.driverVersion || 'Not available',
 			cuda: cudaVersion,
-			name: gpuName || 'Not available',
-			memory: gpuMemory || 'Not available',
+			name: primary.name || 'Not available',
+			memory: formatBytes(primary.memoryTotalBytes),
+			memoryType: primary.memoryType,
+			memoryTotalBytes: primary.memoryTotalBytes,
+			memoryUsedBytes: primary.memoryUsedBytes,
+			memoryFreeBytes: primary.memoryFreeBytes,
+			freeMemoryExact: primary.freeMemoryExact,
+			devices,
 			available: true,
+			sampledAt: new Date().toISOString(),
 		}
 	} catch (error) {
-		return {
+		return createUnavailableGpu('No NVIDIA GPU detected', {
 			driver: 'Not available',
 			cuda: 'Not available',
-			name: 'No NVIDIA GPU detected',
-			memory: 'N/A',
-			available: false,
-		}
+		})
 	}
+}
+
+function findAmdMetric(record, keyPattern) {
+	if (!record || typeof record !== 'object') return null
+	for (const [key, value] of Object.entries(record)) {
+		if (keyPattern.test(key) && (typeof value === 'number' || typeof value === 'string')) {
+			const parsed = parseInteger(value)
+			if (parsed !== null) return parsed
+		}
+		const nested = findAmdMetric(value, keyPattern)
+		if (nested !== null) return nested
+	}
+	return null
+}
+
+function getAmdCliDevices(command, source) {
+	const output = execSync(command, {
+		encoding: 'utf-8',
+		timeout: 5000,
+	}).trim()
+	const parsed = JSON.parse(output)
+	const records = Array.isArray(parsed) ? parsed : Object.entries(parsed)
+		.filter(([key]) => /gpu|card|device/i.test(key))
+		.map(([, value]) => value)
+
+	return records.map((record, index) => {
+		const total = findAmdMetric(record, /vram.*total|total.*vram/i)
+		const used = findAmdMetric(record, /vram.*used|used.*vram/i)
+		const reportedFree = findAmdMetric(record, /vram.*free|free.*vram/i)
+		const free = reportedFree ?? (total !== null && used !== null ? Math.max(0, total - used) : null)
+		return {
+			index,
+			uuid: null,
+			name: `AMD GPU ${index}`,
+			memoryType: 'dedicated',
+			memoryTotalBytes: total,
+			memoryUsedBytes: used,
+			memoryFreeBytes: free,
+			freeMemoryExact: total !== null && free !== null,
+			source,
+		}
+	}).filter(device => device.memoryTotalBytes !== null)
+}
+
+function getLinuxAmdDevices() {
+	const drmPath = '/sys/class/drm'
+	const cards = fs.readdirSync(drmPath).filter(entry => /^card\d+$/.test(entry))
+	const devices = []
+
+	for (const card of cards) {
+		const devicePath = path.join(drmPath, card, 'device')
+		let vendor = ''
+		try {
+			vendor = fs.readFileSync(path.join(devicePath, 'vendor'), 'utf-8').trim().toLowerCase()
+		} catch {
+			continue
+		}
+		if (vendor !== '0x1002') continue
+
+		const total = readIntegerFile(path.join(devicePath, 'mem_info_vram_total'))
+		const used = readIntegerFile(path.join(devicePath, 'mem_info_vram_used'))
+		let slot = null
+		try {
+			const uevent = fs.readFileSync(path.join(devicePath, 'uevent'), 'utf-8')
+			slot = uevent.match(/^PCI_SLOT_NAME=(.+)$/m)?.[1] || null
+		} catch {}
+
+		let name = `AMD GPU ${card.replace('card', '')}`
+		if (slot) {
+			try {
+				name = execSync(`lspci -s ${slot}`, { encoding: 'utf-8', timeout: 3000 }).trim().replace(/^.*?:\s*/, '') || name
+			} catch {}
+		}
+
+		devices.push({
+			index: parseInteger(card),
+			uuid: slot,
+			name,
+			memoryType: 'dedicated',
+			memoryTotalBytes: total,
+			memoryUsedBytes: used,
+			memoryFreeBytes: total !== null && used !== null ? Math.max(0, total - used) : null,
+			freeMemoryExact: total !== null && used !== null,
+			source: 'linux-drm-sysfs',
+		})
+	}
+
+	return devices
 }
 
 /**
@@ -112,9 +262,35 @@ function getNvidiaInfo() {
 function getAmdInfo() {
 	try {
 		const platform = os.platform()
-		
+		let devices = []
+
+		if (platform === 'linux') {
+			try {
+				devices = getLinuxAmdDevices()
+			} catch {}
+		}
+		if (devices.length === 0) {
+			try {
+				devices = getAmdCliDevices('amd-smi metric --mem-usage --json', 'amd-smi')
+			} catch {}
+		}
+		if (devices.length === 0 && platform === 'linux') {
+			try {
+				devices = getAmdCliDevices('rocm-smi --showmeminfo vram --json', 'rocm-smi')
+			} catch {}
+		}
+		if (devices.length > 0) {
+			const primary = devices[0]
+			return {
+				...primary,
+				memory: formatBytes(primary.memoryTotalBytes),
+				devices,
+				available: true,
+				sampledAt: new Date().toISOString(),
+			}
+		}
+
 		if (platform === 'win32') {
-			// Windows: Use wmic to query AMD GPU
 			const output = execSync('wmic path win32_VideoController get name,AdapterRAM /format:csv', {
 				encoding: 'utf-8',
 				timeout: 5000,
@@ -127,60 +303,65 @@ function getAmdInfo() {
 					const name = parts[2].trim()
 					const memoryBytes = parseInt(parts[1]) || 0
 					const memory = memoryBytes > 0 ? `${(memoryBytes / (1024 ** 3)).toFixed(2)} GB` : 'Not available'
-					
+
 					return {
-						name: name,
-						memory: memory,
+						name,
+						memory,
+						memoryType: 'dedicated',
+						memoryTotalBytes: memoryBytes || null,
+						memoryUsedBytes: null,
+						memoryFreeBytes: null,
+						freeMemoryExact: false,
+						devices: [],
 						available: true,
+						sampledAt: new Date().toISOString(),
 					}
 				}
 			}
-		} else if (platform === 'linux') {
-			// Linux: Use lspci to find AMD GPU
 			try {
-				const output = execSync('lspci | grep -i vga', {
+				const output = execSync('powershell -NoProfile -Command "Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM | ConvertTo-Json -Compress"', {
 					encoding: 'utf-8',
 					timeout: 5000,
-				}).trim()
-				
-				if (output.includes('AMD') || output.includes('Radeon')) {
-					const match = output.match(/: (.+)/)
-					const name = match ? match[1].trim() : 'AMD GPU detected'
-					
-					// Try to get memory info from rocm-smi if available
-					let memory = 'Not available'
-					try {
-						const rocmOutput = execSync('rocm-smi --showmeminfo vram --csv', {
-							encoding: 'utf-8',
-							timeout: 5000,
-						})
-						const memMatch = rocmOutput.match(/(\d+)\s*MB/)
-						if (memMatch) {
-							memory = `${(parseInt(memMatch[1]) / 1024).toFixed(2)} GB`
-						}
-					} catch {}
-					
+				})
+				const records = JSON.parse(output)
+				const amdGpu = (Array.isArray(records) ? records : [records]).find(record => /AMD|Radeon/i.test(record.Name || ''))
+				if (amdGpu) {
+					const memoryTotalBytes = Number.isFinite(amdGpu.AdapterRAM) ? amdGpu.AdapterRAM : null
 					return {
-						name: name,
-						memory: memory,
+						name: amdGpu.Name,
+						memory: formatBytes(memoryTotalBytes),
+						memoryType: 'dedicated',
+						memoryTotalBytes,
+						memoryUsedBytes: null,
+						memoryFreeBytes: null,
+						freeMemoryExact: false,
+						devices: [],
 						available: true,
+						sampledAt: new Date().toISOString(),
 					}
 				}
 			} catch {}
 		}
-		
-		return {
-			name: 'No AMD GPU detected',
-			memory: 'N/A',
-			available: false,
-		}
+
+		return createUnavailableGpu('No AMD GPU detected')
 	} catch (error) {
-		return {
-			name: 'No AMD GPU detected',
-			memory: 'N/A',
-			available: false,
-		}
+		return createUnavailableGpu('No AMD GPU detected')
 	}
+}
+
+function getMacAvailableMemory() {
+	const output = execSync('vm_stat', { encoding: 'utf-8', timeout: 5000 })
+	const pageSize = parseInteger(output.match(/page size of (\d+) bytes/i)?.[1]) || 4096
+	const pageCounts = {}
+	for (const line of output.split(/\r?\n/)) {
+		const match = line.match(/^([^:]+):\s+([\d.]+)/)
+		if (match) pageCounts[match[1].trim()] = parseInteger(match[2]) || 0
+	}
+	const availablePages = (pageCounts['Pages free'] || 0)
+		+ (pageCounts['Pages inactive'] || 0)
+		+ (pageCounts['Pages speculative'] || 0)
+		+ (pageCounts['Pages purgeable'] || 0)
+	return availablePages * pageSize
 }
 
 /**
@@ -214,27 +395,53 @@ function getMacInfo() {
 				}
 			}
 			
+			let memoryAvailableBytes = os.freemem()
+			try {
+				memoryAvailableBytes = getMacAvailableMemory()
+			} catch {}
+			let pressureFreePercent = null
+			try {
+				const pressure = execSync('memory_pressure -Q', { encoding: 'utf-8', timeout: 5000 })
+				pressureFreePercent = parseInteger(pressure.match(/System-wide memory free percentage:\s*(\d+)%/i)?.[1])
+			} catch {}
+
+			const device = {
+				index: 0,
+				uuid: null,
+				name,
+				memoryType: 'unified',
+				memoryTotalBytes: os.totalmem(),
+				memoryUsedBytes: Math.max(0, os.totalmem() - memoryAvailableBytes),
+				memoryFreeBytes: memoryAvailableBytes,
+				freeMemoryExact: false,
+				source: 'macos-vm-stat-estimate',
+			}
+
 			return {
 				name: name,
 				memory: memory,
+				memoryType: device.memoryType,
+				memoryTotalBytes: device.memoryTotalBytes,
+				memoryUsedBytes: device.memoryUsedBytes,
+				memoryFreeBytes: device.memoryFreeBytes,
+				freeMemoryExact: false,
+				pressureFreePercent,
+				devices: [device],
 				available: true,
 				metal: true,
+				sampledAt: new Date().toISOString(),
 			}
 		}
 		
-		return {
-			name: 'Not a Mac',
-			memory: 'N/A',
-			available: false,
+		return createUnavailableGpu('Not a Mac', {
 			metal: false,
-		}
+			memoryType: 'unified',
+		})
 	} catch (error) {
-		return {
-			name: 'No Mac GPU detected',
-			memory: 'N/A',
-			available: false,
+		return createUnavailableGpu('No Mac GPU detected', {
 			metal: false,
-		}
+			memoryType: 'unified',
+		})
 	}
 }
 
@@ -537,6 +744,19 @@ async function fetchAvailableModels() {
 		console.warn('⚠️  Could not fetch models from Ollama')
 		return []
 	}
+}
+
+function normalizeOllamaRunningModels(data) {
+	return (data?.models || []).map(model => ({
+		name: model.name || null,
+		model: model.model || model.name || null,
+		sizeBytes: Number.isFinite(model.size) ? model.size : null,
+		digest: model.digest || null,
+		details: model.details || null,
+		expiresAt: model.expires_at || null,
+		sizeVramBytes: Number.isFinite(model.size_vram) ? model.size_vram : null,
+		contextLength: Number.isFinite(model.context_length) ? model.context_length : null,
+	}))
 }
 
 // Keep a global reference of the window object
@@ -1241,15 +1461,27 @@ ipcMain.handle('check-ollama', async (event) => {
 // Check loaded models (models currently in GPU memory)
 ipcMain.handle('check-loaded-models', async (event) => {
 	try {
-		const axios = require('axios')
 		const response = await axios.get(`${OLLAMA_SERVER_URL}/api/ps`, {
 			timeout: 5000,
 		})
-		// Extract model names from running models
-		const loadedModels = (response.data.models || []).map(m => m.name)
-		return { success: true, models: loadedModels }
+		const runningModels = normalizeOllamaRunningModels(response.data)
+		const sizeVramUsedBytes = runningModels.reduce((total, model) => total + (model.sizeVramBytes || 0), 0)
+		return {
+			success: true,
+			models: runningModels.map(model => model.name).filter(Boolean),
+			runningModels,
+			sizeVramUsedBytes,
+			sampledAt: new Date().toISOString(),
+		}
 	} catch (error) {
-		return { success: false, error: 'Could not fetch loaded models', models: [] }
+		return {
+			success: false,
+			error: 'Could not fetch loaded models',
+			models: [],
+			runningModels: [],
+			sizeVramUsedBytes: 0,
+			sampledAt: new Date().toISOString(),
+		}
 	}
 })
 
